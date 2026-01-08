@@ -1,0 +1,177 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+*.ipynb_checkpoints/
+
+# PyCharm
+.idea/
+*.iml
+*.iws
+.idea_modules/
+
+# VS Code
+.vscode/
+*.code-workspace
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+*.env
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Logs
+logs/
+*.log
+*.log.*
+
+# Testing
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.nox/
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+
+# Documentation
+docs/_build/
+site/
+
+# Data
+data/documents/
+data/raw/
+data/processed/
+*.csv
+*.tsv
+*.parquet
+
+# Benchmarks
+benchmarks/results/**/*.json
+benchmarks/results/**/*.csv
+benchmarks/results/figures/
+!benchmarks/datasets/  # Keep dataset folder structure
+
+# Cache
+cache/
+.cache/
+*.cache
+__pycache__/
+
+# Docker
+.dockerignore
+
+# OS
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+desktop.ini
+
+# IDE
+*.swp
+*.swo
+*~
+.project
+.pydevproject
+.settings/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+*.bak
+*.backup
+
+# Model files (if storing locally)
+models/
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.gguf
+
+# Large files
+*.zip
+*.tar.gz
+*.tar
+*.gz
+
+# Secrets
+secrets/
+*.key
+*.pem
+*.cert
+
+# Specific to this project
+# PostgreSQL data
+postgres_data/
+
+# Neo4j data
+neo4j_data/
+neo4j_logs/
+neo4j_plugins/
+
+# Ollama data
+ollama_data/
+
+# Evaluation outputs (keep structure, ignore content)
+benchmarks/results/answers_*.json
+benchmarks/results/scores_*.json
+benchmarks/results/analysis_*.md
+benchmarks/results/*.csv
+
+# Notebooks with outputs
+notebooks/*-checkpoint.ipynb
+
+# mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre
+.pyre/
+
+# pytype
+.pytype/
+
+# Cython debug symbols
+cython_debug/
