@@ -187,8 +187,8 @@ docker-compose up -d
 docker-compose ps
 
 # Initialize databases
-python -m src.utils.db init
-python -m src.utils.graph init
+uv run python -m src.utils.db init
+uv run python -m src.utils.graph init
 ```
 
 ### 4. Ingest Documents
