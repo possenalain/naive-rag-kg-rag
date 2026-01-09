@@ -33,16 +33,19 @@ services:
 
   # Neo4j graph database
   neo4j:
-    image: neo4j:5.15-community
+    image: neo4j:5.18-community
     container_name: rag_neo4j
     environment:
       # Authentication
       NEO4J_AUTH: neo4j/${NEO4J_PASSWORD}
       
-      # Plugins (GDS is enterprise-only, keeping APOC)
-      NEO4J_PLUGINS: '["apoc"]'
+      # Plugins - APOC and APOC Extended for vector functions
+      NEO4J_PLUGINS: '["apoc", "apoc-extended"]'
       NEO4J_dbms_security_procedures_unrestricted: apoc.*
       NEO4J_dbms_security_procedures_allowlist: apoc.*
+      
+      # Enable vector index support
+      NEO4J_db_tx__log_rotation_retention__policy: "7 days"
       
       # Memory configuration
       NEO4J_dbms_memory_pagecache_size: 2G

@@ -9,6 +9,14 @@ from neo4j import AsyncGraphDatabase, AsyncDriver
 from neo4j.exceptions import ServiceUnavailable
 import logging
 from datetime import datetime
+
+# CRITICAL: Apply Graphiti compatibility patches BEFORE importing Graphiti!
+# This must happen before any Graphiti modules are loaded to ensure the patches
+# are applied to the query functions before they're imported by other modules.
+from src.utils.graphiti_patches import apply_all_patches
+apply_all_patches()
+
+# Now import Graphiti after patches are applied
 from graphiti_core import Graphiti
 from graphiti_core.nodes import EntityNode, EpisodicNode, EpisodeType
 from graphiti_core.edges import EntityEdge
@@ -59,7 +67,7 @@ class GraphDatabaseManager:
                 
                 embedder_config = GeminiEmbedderConfig(
                     api_key=settings.embedding.api_key,
-                    model=settings.embedding.model_name,
+                    embedding_model=settings.embedding.model_name,
                     embedding_dim=settings.embedding.dimensions,
                 )
                 embedder_client = GeminiEmbedder(embedder_config)
