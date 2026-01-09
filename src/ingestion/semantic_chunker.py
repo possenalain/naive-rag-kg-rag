@@ -232,14 +232,14 @@ class SemanticChunker:
         self,
         documents: List[Any],  # List of Document objects
         batch_size: int = 10
-    ) -> Dict[Any, List[Chunk]]:
+    ) -> List[tuple]:
         """
         Chunk multiple documents.
         
         Returns:
-            Dictionary mapping documents to their chunks
+            List of tuples (document, chunks)
         """
-        doc_chunks = {}
+        doc_chunks = []
         
         for i, doc in enumerate(documents):
             try:
@@ -252,15 +252,15 @@ class SemanticChunker:
                 }
                 
                 chunks = self.chunk_text(doc.content, chunk_metadata)
-                doc_chunks[doc] = chunks
+                doc_chunks.append((doc, chunks))
                 
                 logger.info(f"Chunked document '{doc.title}': {len(chunks)} chunks")
                 
             except Exception as e:
                 logger.error(f"Error chunking document '{doc.title}': {e}")
-                doc_chunks[doc] = []
+                doc_chunks.append((doc, []))
         
-        total_chunks = sum(len(chunks) for chunks in doc_chunks.values())
+        total_chunks = sum(len(chunks) for _, chunks in doc_chunks)
         logger.info(f"Total chunks created: {total_chunks}")
         
         return doc_chunks

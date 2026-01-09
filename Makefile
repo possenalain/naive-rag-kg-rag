@@ -1,20 +1,32 @@
-.PHONY: help install install-dev clean test lint format docker-up docker-down setup
+.PHONY: help install install-dev clean test lint format docker-up docker-down docker-build docker-build-dev setup
 
 # Default target
 help:
+	@echo ""
 	@echo "Available commands:"
+	@echo ""
+	@echo "Setup & Installation:"
 	@echo "  make install        - Create venv and install dependencies with UV"
 	@echo "  make install-dev    - Install with dev dependencies"
-	@echo "  make clean          - Remove virtual environment and cache files"
-	@echo "  make test           - Run tests with pytest"
-	@echo "  make lint           - Run linters (flake8, mypy)"
-	@echo "  make format         - Format code with black and isort"
-	@echo "  make docker-up      - Start Docker services (PostgreSQL, Neo4j)"
-	@echo "  make docker-down    - Stop Docker services"
 	@echo "  make setup          - Complete setup (install + docker)"
 	@echo "  make sync           - Sync dependencies from lockfile"
 	@echo "  make update         - Update all dependencies"
+	@echo ""
+	@echo "Development:"
+	@echo "  make test           - Run tests with pytest"
+	@echo "  make lint           - Run linters (flake8, mypy)"
+	@echo "  make format         - Format code with black and isort"
+	@echo "  make clean          - Remove virtual environment and cache files"
 	@echo "  make run-jupyter    - Start Jupyter Lab"
+	@echo ""
+	@echo "Docker:"
+	@echo "  make docker-up      - Start Docker services (PostgreSQL, Neo4j)"
+	@echo "  make docker-down    - Stop Docker services"
+	@echo "  make docker-build   - Build production Docker image"
+	@echo "  make docker-build-dev - Build development Docker image"
+	@echo ""
+	@echo "See docs/DOCKER_GUIDE.md for Docker usage details"
+	@echo ""
 
 # Install UV if not present
 check-uv:
@@ -128,6 +140,16 @@ env-info:
 	@uv run python --version
 	@echo "\nInstalled Packages:"
 	@uv pip list
+
+# Build production Docker image
+docker-build:
+	docker build -t naive-rag:latest .
+	@echo "✅ Production image built: naive-rag:latest"
+
+# Build development Docker image
+docker-build-dev:
+	docker build -f Dockerfile.dev -t naive-rag:dev .
+	@echo "✅ Development image built: naive-rag:dev"
 
 # Add a new dependency
 add:

@@ -12,7 +12,7 @@ from pathlib import Path
 class DatabaseSettings(BaseSettings):
     """Database configuration settings."""
     
-    model_config = SettingsConfigDict(env_prefix="POSTGRES_", env_file=".env")
+    model_config = SettingsConfigDict(env_prefix="POSTGRES_", env_file=".env", extra="ignore")
     
     url: str = Field(..., description="PostgreSQL connection URL")
     db: str = Field(default="rag_benchmark", description="Database name")
@@ -26,7 +26,7 @@ class DatabaseSettings(BaseSettings):
 class Neo4jSettings(BaseSettings):
     """Neo4j graph database configuration."""
     
-    model_config = SettingsConfigDict(env_prefix="NEO4J_", env_file=".env")
+    model_config = SettingsConfigDict(env_prefix="NEO4J_", env_file=".env", extra="ignore")
     
     uri: str = Field(default="bolt://localhost:7687", description="Neo4j connection URI")
     user: str = Field(default="neo4j", description="Neo4j username")
@@ -37,7 +37,7 @@ class Neo4jSettings(BaseSettings):
 class LLMSettings(BaseSettings):
     """LLM provider configuration."""
     
-    model_config = SettingsConfigDict(env_prefix="LLM_", env_file=".env")
+    model_config = SettingsConfigDict(env_prefix="LLM_", env_file=".env", extra="ignore")
     
     provider: Literal["gemini", "openai", "ollama"] = Field(
         default="gemini",
@@ -54,7 +54,7 @@ class LLMSettings(BaseSettings):
 class EmbeddingSettings(BaseSettings):
     """Embedding model configuration."""
     
-    model_config = SettingsConfigDict(env_prefix="EMBEDDING_", env_file=".env")
+    model_config = SettingsConfigDict(env_prefix="EMBEDDING_", env_file=".env", extra="ignore")
     
     provider: Literal["gemini", "openai", "ollama"] = Field(
         default="gemini",
@@ -70,7 +70,7 @@ class EmbeddingSettings(BaseSettings):
 class IngestionSettings(BaseSettings):
     """Document ingestion configuration."""
     
-    model_config = SettingsConfigDict(env_prefix="INGESTION_", env_file=".env")
+    model_config = SettingsConfigDict(env_prefix="INGESTION_", env_file=".env", extra="ignore")
     
     chunk_size: int = Field(default=512, ge=1, description="Target chunk size in tokens")
     chunk_overlap: int = Field(default=50, ge=0, description="Overlap between chunks")
@@ -82,7 +82,7 @@ class IngestionSettings(BaseSettings):
 class BenchmarkSettings(BaseSettings):
     """Benchmark evaluation configuration."""
     
-    model_config = SettingsConfigDict(env_prefix="BENCHMARK_", env_file=".env")
+    model_config = SettingsConfigDict(env_prefix="BENCHMARK_", env_file=".env", extra="ignore")
     
     dataset_name: str = Field(default="hotpotqa", description="Benchmark dataset name")
     num_questions: int = Field(default=50, ge=1, description="Number of questions to evaluate")
@@ -94,7 +94,7 @@ class BenchmarkSettings(BaseSettings):
 class EvaluationSettings(BaseSettings):
     """LLM-based evaluation configuration."""
     
-    model_config = SettingsConfigDict(env_prefix="EVAL_", env_file=".env")
+    model_config = SettingsConfigDict(env_prefix="EVAL_", env_file=".env", extra="ignore")
     
     llm_provider: Literal["gemini", "openai", "ollama"] = Field(
         default="gemini",
@@ -110,7 +110,7 @@ class EvaluationSettings(BaseSettings):
 class RAGSettings(BaseSettings):
     """RAG variant configuration."""
     
-    model_config = SettingsConfigDict(env_prefix="RAG_", env_file=".env")
+    model_config = SettingsConfigDict(env_prefix="RAG_", env_file=".env", extra="ignore")
     
     top_k: int = Field(default=5, ge=1, description="Number of chunks to retrieve")
     max_hops: int = Field(default=3, ge=1, le=10, description="Max hops for graph traversal")
@@ -135,7 +135,7 @@ class RAGSettings(BaseSettings):
 class AppSettings(BaseSettings):
     """Application-level configuration."""
     
-    model_config = SettingsConfigDict(env_prefix="APP_", env_file=".env")
+    model_config = SettingsConfigDict(env_prefix="APP_", env_file=".env", extra="ignore")
     
     env: Literal["development", "staging", "production"] = Field(
         default="development",
@@ -156,7 +156,7 @@ class AppSettings(BaseSettings):
 class CacheSettings(BaseSettings):
     """Caching configuration."""
     
-    model_config = SettingsConfigDict(env_prefix="CACHE_", env_file=".env")
+    model_config = SettingsConfigDict(env_prefix="CACHE_", env_file=".env", extra="ignore")
     
     enable_embedding_cache: bool = Field(default=True, description="Cache embeddings")
     dir: str = Field(default="./cache", description="Cache directory")

@@ -108,7 +108,7 @@ class IngestionPipeline:
         # Step 2: Chunk documents
         logger.info("Step 2/5: Chunking documents...")
         doc_chunks = self.chunker.chunk_documents(documents)
-        all_chunks = [chunk for chunks in doc_chunks.values() for chunk in chunks]
+        all_chunks = [chunk for _, chunks in doc_chunks for chunk in chunks]
         chunk_stats = self.chunker.get_chunk_stats(all_chunks)
         logger.info(f"Created {chunk_stats['total_chunks']} chunks, "
                    f"avg {chunk_stats['avg_tokens']} tokens/chunk")
@@ -168,7 +168,7 @@ class IngestionPipeline:
         embeddings = await self.embedder.embed_batch([c.text for c in chunks])
         
         # Store
-        stored_chunks = await self._store_in_postgres([document], {document: chunks}, embeddings)
+        stored_chunks = await self._store_in_postgres([document], [(document, chunks)], embeddings)
         
         # Build KG
         kg_stats = {}
@@ -185,14 +185,15 @@ class IngestionPipeline:
     async def _store_in_postgres(
         self,
         documents: List[Document],
-        doc_chunks: Dict[Document, List[Chunk]],
+        doc_chunks: List[tuple],  # List of (document, chunks) tuples
         embeddings: List[List[float]]
     ) -> List[Dict[str, Any]]:
         """Store documents and chunks in PostgreSQL."""
         stored_chunks = []
         embedding_idx = 0
         
-        for document in documents:
+        # Iterate through doc_chunks tuples
+        for document, chunks in doc_chunks:
             try:
                 # Insert document
                 doc_id = await self.db.insert_document(
@@ -203,7 +204,6 @@ class IngestionPipeline:
                 )
                 
                 # Insert chunks for this document
-                chunks = doc_chunks[document]
                 for chunk in chunks:
                     embedding = embeddings[embedding_idx]
                     embedding_idx += 1

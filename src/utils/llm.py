@@ -8,7 +8,7 @@ from typing import List, Dict, Any, Optional, Union
 import asyncio
 import logging
 from enum import Enum
-import google.generativeai as genai
+from google import genai
 from openai import AsyncOpenAI
 import httpx
 
@@ -70,10 +70,9 @@ class GeminiProvider(BaseLLMProvider):
         model_name: str = "gemini-1.5-pro",
         embedding_model: str = "text-embedding-004"
     ):
-        genai.configure(api_key=api_key)
+        self.client = genai.Client(api_key=api_key)
         self.model_name = model_name
         self.embedding_model = embedding_model
-        self.model = genai.GenerativeModel(model_name)
         logger.info(f"Initialized Gemini provider with model: {model_name}")
     
     async def generate(
@@ -89,16 +88,14 @@ class GeminiProvider(BaseLLMProvider):
             # Combine system prompt with user prompt
             full_prompt = f"{system_prompt}\n\n{prompt}" if system_prompt else prompt
             
-            # Configure generation
-            generation_config = genai.GenerationConfig(
-                temperature=temperature,
-                max_output_tokens=max_tokens,
-            )
-            
-            # Generate (sync call, but fast enough)
-            response = self.model.generate_content(
-                full_prompt,
-                generation_config=generation_config
+            # Generate using new API
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=full_prompt,
+                config=genai.types.GenerateContentConfig(
+                    temperature=temperature,
+                    max_output_tokens=max_tokens,
+                )
             )
             
             return response.text
@@ -117,21 +114,19 @@ class GeminiProvider(BaseLLMProvider):
         """Chat completion with Gemini."""
         try:
             # Convert messages to Gemini format
-            chat = self.model.start_chat(history=[])
-            
-            # Process messages
-            for msg in messages[:-1]:  # All but last
+            contents = []
+            for msg in messages:
                 role = "user" if msg["role"] == "user" else "model"
-                chat.history.append({
-                    "role": role,
-                    "parts": [msg["content"]]
-                })
+                contents.append(genai.types.Content(
+                    role=role,
+                    parts=[genai.types.Part(text=msg["content"])]
+                ))
             
-            # Send last message and get response
-            last_msg = messages[-1]["content"]
-            response = chat.send_message(
-                last_msg,
-                generation_config=genai.GenerationConfig(
+            # Generate response
+            response = self.client.models.generate_content(
+                model=self.model_name,
+                contents=contents,
+                config=genai.types.GenerateContentConfig(
                     temperature=temperature,
                     max_output_tokens=max_tokens,
                 )
@@ -160,18 +155,13 @@ class GeminiProvider(BaseLLMProvider):
             for i in range(0, len(text_list), batch_size):
                 batch = text_list[i:i + batch_size]
                 
-                # Use genai.embed_content for batch
-                result = genai.embed_content(
-                    model=f"models/{self.embedding_model}",
-                    content=batch,
-                    task_type="retrieval_document"
-                )
-                
-                if 'embedding' in result:
-                    embeddings.append(result['embedding'])
-                else:
-                    # Multiple embeddings returned
-                    embeddings.extend([r for r in result['embeddings']])
+                # Use new API for batch embedding
+                for text in batch:
+                    result = self.client.models.embed_content(
+                        model=self.embedding_model,
+                        contents=text,
+                    )
+                    embeddings.append(result.embeddings[0].values)
             
             return embeddings[0] if is_single else embeddings
             

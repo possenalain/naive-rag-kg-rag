@@ -1,3 +1,23 @@
+# ============================================================================
+# PRODUCTION DOCKERFILE
+# ============================================================================
+# Purpose: Optimized production image for deployment
+# Size: ~500MB (multi-stage build)
+# Use when: Deploying to production, cloud services, or distribution
+# 
+# Build: docker build -t naive-rag:latest .
+# Run:   docker run -it --rm --env-file .env naive-rag:latest
+#
+# Features:
+# - Multi-stage build (smaller image)
+# - Only production dependencies
+# - Non-root user for security
+# - Minimal attack surface
+# - Fast startup time
+#
+# See docs/DOCKER_GUIDE.md for complete documentation
+# ============================================================================
+
 # Multi-stage build using UV for fast dependency installation
 FROM python:3.11-slim as builder
 

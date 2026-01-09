@@ -10,8 +10,11 @@ from neo4j.exceptions import ServiceUnavailable
 import logging
 from datetime import datetime
 from graphiti_core import Graphiti
-from graphiti_core.nodes import EntityNode, EpisodeNode
+from graphiti_core.nodes import EntityNode, EpisodicNode
 from graphiti_core.edges import EntityEdge
+from graphiti_core.llm_client import LLMConfig
+from graphiti_core.llm_client.gemini_client import GeminiClient
+from graphiti_core.embedder.gemini import GeminiEmbedder, GeminiEmbedderConfig
 
 from config.settings import get_settings
 
@@ -47,14 +50,29 @@ class GraphDatabaseManager:
                 
                 logger.info("Neo4j driver initialized")
                 
-                # Initialize Graphiti
-                self.graphiti = Graphiti(
-                    neo4j_uri=settings.neo4j.uri,
-                    neo4j_user=settings.neo4j.user,
-                    neo4j_password=settings.neo4j.password
+                # Initialize Graphiti with Google Gemini clients
+                llm_config = LLMConfig(
+                    api_key=settings.llm.api_key,
+                    model=settings.llm.model_name,
                 )
-                await self.graphiti.build_indices()
-                logger.info("Graphiti initialized with indices")
+                llm_client = GeminiClient(llm_config)
+                
+                embedder_config = GeminiEmbedderConfig(
+                    api_key=settings.embedding.api_key,
+                    model=settings.embedding.model_name,
+                    embedding_dim=settings.embedding.dimensions,
+                )
+                embedder_client = GeminiEmbedder(embedder_config)
+                
+                self.graphiti = Graphiti(
+                    uri=settings.neo4j.uri,
+                    user=settings.neo4j.user,
+                    password=settings.neo4j.password,
+                    llm_client=llm_client,
+                    embedder=embedder_client,
+                )
+                await self.graphiti.build_indices_and_constraints()
+                logger.info("Graphiti initialized with Google Gemini LLM and embedder")
                 
             except ServiceUnavailable as e:
                 logger.error(f"Failed to connect to Neo4j: {e}")
@@ -162,7 +180,7 @@ class GraphDatabaseManager:
         source: str,
         source_description: str,
         metadata: Optional[Dict[str, Any]] = None
-    ) -> EpisodeNode:
+    ) -> EpisodicNode:
         """
         Add an episode (document chunk) to the knowledge graph using Graphiti.
         Graphiti will extract entities and relationships automatically.
@@ -493,3 +511,27 @@ async def get_graph() -> GraphDatabaseManager:
     if not graph_manager.driver:
         await graph_manager.initialize()
     return graph_manager
+
+
+if __name__ == "__main__":
+    import sys
+    
+    async def init_graph():
+        """Initialize graph database with indices and constraints."""
+        try:
+            await graph_manager.initialize()
+            logger.info("Graph database initialized successfully")
+            await graph_manager.close()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to initialize graph database: {e}")
+            await graph_manager.close()
+            return False
+    
+    if len(sys.argv) > 1 and sys.argv[1] == "init":
+        logging.basicConfig(level=logging.INFO)
+        success = asyncio.run(init_graph())
+        sys.exit(0 if success else 1)
+    else:
+        print("Usage: python -m src.utils.graph init")
+        sys.exit(1)

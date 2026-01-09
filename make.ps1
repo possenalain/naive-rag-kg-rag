@@ -8,18 +8,29 @@ param(
 
 function Show-Help {
     Write-Host "Available commands:" -ForegroundColor Cyan
+    Write-Host ""
+    Write-Host "Setup & Installation:" -ForegroundColor Yellow
     Write-Host "  .\make.ps1 install        - Create venv and install dependencies with UV"
     Write-Host "  .\make.ps1 install-dev    - Install with dev dependencies"
-    Write-Host "  .\make.ps1 clean          - Remove virtual environment and cache files"
+    Write-Host "  .\make.ps1 setup          - Complete setup (install + docker)"
+    Write-Host "  .\make.ps1 sync           - Sync dependencies from lockfile"
+    Write-Host "  .\make.ps1 sync-req       - Generate requirements.txt from pyproject.toml"
+    Write-Host "  .\make.ps1 update         - Update all dependencies"
+    Write-Host ""
+    Write-Host "Development:" -ForegroundColor Yellow
     Write-Host "  .\make.ps1 test           - Run tests with pytest"
     Write-Host "  .\make.ps1 lint           - Run linters (flake8, mypy)"
     Write-Host "  .\make.ps1 format         - Format code with black and isort"
+    Write-Host "  .\make.ps1 clean          - Remove virtual environment and cache files"
+    Write-Host "  .\make.ps1 run-jupyter    - Start Jupyter Lab"
+    Write-Host ""
+    Write-Host "Docker:" -ForegroundColor Yellow
     Write-Host "  .\make.ps1 docker-up      - Start Docker services (PostgreSQL, Neo4j)"
     Write-Host "  .\make.ps1 docker-down    - Stop Docker services"
-    Write-Host "  .\make.ps1 setup          - Complete setup (install + docker)"
-    Write-Host "  .\make.ps1 sync           - Sync dependencies from lockfile"
-    Write-Host "  .\make.ps1 update         - Update all dependencies"
-    Write-Host "  .\make.ps1 run-jupyter    - Start Jupyter Lab"
+    Write-Host "  .\make.ps1 docker-build   - Build production Docker image"
+    Write-Host "  .\make.ps1 docker-build-dev - Build development Docker image"
+    Write-Host ""
+    Write-Host "See docs/DOCKER_GUIDE.md for Docker usage details" -ForegroundColor Cyan
 }
 
 function Test-UV {
@@ -55,6 +66,13 @@ function Sync-Dependencies {
     Write-Host "Syncing dependencies from lockfile..." -ForegroundColor Cyan
     uv sync --all-extras
     Write-Host "✅ Dependencies synced!" -ForegroundColor Green
+}
+
+function Sync-Requirements {
+    Test-UV
+    Write-Host "Generating requirements.txt from pyproject.toml..." -ForegroundColor Cyan
+    uv pip compile pyproject.toml -o requirements.txt
+    Write-Host "✅ requirements.txt generated!" -ForegroundColor Green
 }
 
 function Update-Dependencies {
@@ -185,18 +203,33 @@ function Add-DevPackage {
     Write-Host "✅ Dev package added!" -ForegroundColor Green
 }
 
+function Build-DockerProd {
+    Write-Host "Building production Docker image..." -ForegroundColor Cyan
+    docker build -t naive-rag:latest .
+    Write-Host "✅ Production image built: naive-rag:latest" -ForegroundColor Green
+}
+
+function Build-DockerDev {
+    Write-Host "Building development Docker image..." -ForegroundColor Cyan
+    docker build -f Dockerfile.dev -t naive-rag:dev .
+    Write-Host "✅ Development image built: naive-rag:dev" -ForegroundColor Green
+}
+
 # Command dispatcher
 switch ($Command.ToLower()) {
     "help" { Show-Help }
     "install" { Install-Project }
     "install-dev" { Install-Dev }
     "sync" { Sync-Dependencies }
+    "sync-req" { Sync-Requirements }
     "update" { Update-Dependencies }
     "clean" { Clean-Project }
     "test" { Run-Tests }
     "test-cov" { Run-TestsWithCoverage }
     "lint" { Run-Lint }
     "format-check" { Check-Format }
+    "docker-build" { Build-DockerProd }
+    "docker-build-dev" { Build-DockerDev }
     "format" { Format-Code }
     "docker-up" { Start-Docker }
     "docker-down" { Stop-Docker }

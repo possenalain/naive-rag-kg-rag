@@ -5,9 +5,10 @@ A comprehensive benchmarking system to compare and evaluate three Retrieval-Augm
 > 🚀 **Now using [UV](https://github.com/astral-sh/uv)** - A blazingly fast Python package manager (10-100x faster than pip)!
 >
 > 📚 **Setup Guides**:
-> - [UV_MIGRATION.md](UV_MIGRATION.md) - UV usage and benefits
-> - [SETUP_GUIDE.md](SETUP_GUIDE.md) - Complete setup instructions
-> - [QUICKSTART.md](QUICKSTART.md) - Quick start in 10 minutes
+> - [QUICKSTART.md](docs/QUICKSTART.md) - Quick start in 10 minutes ⚡
+> - [SETUP_GUIDE.md](docs/SETUP_GUIDE.md) - Complete setup instructions
+> - [UV_MIGRATION.md](docs/UV_MIGRATION.md) - UV usage and benefits
+> - [DOCKER_GUIDE.md](docs/DOCKER_GUIDE.md) - Docker usage guide
 
 ## 🎯 Project Goals
 
@@ -27,6 +28,15 @@ Evaluate performance on multi-hop reasoning tasks using standard benchmarks (Hot
 
 ```
 naive-rag-kg-rag/
+├── docs/                            # 📚 All documentation
+│   ├── README.md                    # Documentation index
+│   ├── QUICKSTART.md                # Quick start guide
+│   ├── SETUP_GUIDE.md               # Complete setup instructions
+│   ├── UV_MIGRATION.md              # UV usage guide
+│   ├── DOCKER_GUIDE.md              # Docker guide
+│   ├── ARCHITECTURE.md              # System architecture
+│   ├── IMPLEMENTATION_PLAN.md       # Implementation roadmap
+│   └── TASKS.md                     # Task tracking
 ├── config/                          # Configuration management
 │   ├── __init__.py
 │   ├── settings.py                  # Pydantic settings
@@ -155,7 +165,7 @@ source venv/bin/activate
 pip install -r requirements.txt
 ```
 
-> 💡 **Tip**: See [UV_MIGRATION.md](UV_MIGRATION.md) for detailed UV usage and migration guide.
+> 💡 **Tip**: See [UV_MIGRATION.md](docs/UV_MIGRATION.md) for detailed UV usage and migration guide.
 
 ### 2. Configure Environment
 
@@ -246,7 +256,30 @@ Or use Jupyter notebooks:
 jupyter lab notebooks/
 ```
 
-## 🔧 Configuration
+## � Docker Usage
+
+This project provides two Dockerfiles for different use cases:
+
+- **`Dockerfile`** - Optimized production image (~500MB)
+- **`Dockerfile.dev`** - Full development environment (~800MB)
+
+**Quick Start**:
+```bash
+# Build production image
+docker build -t naive-rag:latest .
+
+# Build development image
+docker build -f Dockerfile.dev -t naive-rag:dev .
+
+# Run with docker-compose (databases only)
+docker-compose up -d
+```
+
+**Recommended Workflow**: Use UV locally for development (fastest), Docker for deployment.
+
+See [DOCKER_GUIDE.md](docs/DOCKER_GUIDE.md) for complete Docker documentation.
+
+## �🔧 Configuration
 
 ### Helper Scripts
 

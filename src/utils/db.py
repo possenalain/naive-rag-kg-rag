@@ -8,6 +8,7 @@ import asyncpg
 from typing import List, Optional, Dict, Any, Tuple
 from contextlib import asynccontextmanager
 import logging
+import json
 import numpy as np
 from datetime import datetime
 
@@ -95,7 +96,7 @@ class DatabaseManager:
                 title,
                 source_path,
                 content,
-                metadata or {},
+                json.dumps(metadata or {}),
                 datetime.utcnow()
             )
         logger.debug(f"Inserted document: {title} (ID: {document_id})")
@@ -155,17 +156,20 @@ class DatabaseManager:
         """Insert a chunk with its embedding."""
         query = """
             INSERT INTO chunks (document_id, chunk_text, chunk_index, embedding, metadata)
-            VALUES ($1, $2, $3, $4, $5)
+            VALUES ($1, $2, $3, $4::vector, $5)
             RETURNING chunk_id
         """
+        # Convert embedding list to postgres vector format string
+        embedding_str = '[' + ','.join(str(x) for x in embedding) + ']'
+        
         async with self.connection() as conn:
             chunk_id = await conn.fetchval(
                 query,
                 document_id,
                 chunk_text,
                 chunk_index,
-                embedding,
-                metadata or {}
+                embedding_str,
+                json.dumps(metadata or {})
             )
         return chunk_id
     
@@ -508,3 +512,50 @@ async def get_db() -> DatabaseManager:
     if not db_manager.pool:
         await db_manager.initialize()
     return db_manager
+
+
+if __name__ == "__main__":
+    import sys
+    import os
+    
+    async def init_database():
+        """Initialize database schema from SQL file."""
+        try:
+            # Initialize connection
+            await db_manager.initialize()
+            logger.info("Database connection initialized")
+            
+            # Read schema file
+            schema_path = os.path.join(os.path.dirname(__file__), "..", "..", "sql", "schema.sql")
+            schema_path = os.path.normpath(schema_path)
+            
+            if not os.path.exists(schema_path):
+                logger.error(f"Schema file not found: {schema_path}")
+                return False
+            
+            with open(schema_path, 'r') as f:
+                schema_sql = f.read()
+            
+            logger.info(f"Loaded schema from {schema_path}")
+            
+            # Execute schema
+            async with db_manager.connection() as conn:
+                await conn.execute(schema_sql)
+            
+            logger.info("Database schema initialized successfully")
+            
+            await db_manager.close()
+            return True
+            
+        except Exception as e:
+            logger.error(f"Failed to initialize database: {e}")
+            await db_manager.close()
+            return False
+    
+    if len(sys.argv) > 1 and sys.argv[1] == "init":
+        logging.basicConfig(level=logging.INFO)
+        success = asyncio.run(init_database())
+        sys.exit(0 if success else 1)
+    else:
+        print("Usage: python -m src.utils.db init")
+        sys.exit(1)

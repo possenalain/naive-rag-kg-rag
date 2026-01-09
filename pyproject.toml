@@ -11,99 +11,99 @@ license = { text = "MIT" }
 
 dependencies = [
     # Core Dependencies
-    "python-dotenv==1.0.0",
-    "pydantic==2.11.0",
-    "pydantic-settings==2.5.0",
-    "pydantic-ai==0.3.0",
+    "python-dotenv>=1.0",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "pydantic-ai>=0.3",
     
     # Database
-    "asyncpg==0.30.0",
-    "psycopg2-binary==2.9.9",
-    "neo4j==5.28.0",
-    "graphiti-core==0.12.4",
+    "asyncpg>=0.29",
+    "psycopg2-binary>=2.9",
+    "neo4j>=5.0",
+    "graphiti-core[google-genai]>=0.12",
     
     # LLM & Embeddings
-    "openai==1.90.0",
-    "google-generativeai==0.8.0",
-    "anthropic==0.54.0",
-    "tiktoken==0.8.0",
+    "openai>=1.0",
+    "google-genai>=1.0",
+    "anthropic>=0.54",
+    "tiktoken>=0.7",
     
     # FastAPI (if building API)
-    "fastapi==0.115.0",
-    "uvicorn[standard]==0.34.0",
-    "python-multipart==0.0.20",
-    "sse-starlette==2.3.0",
+    "fastapi>=0.100",
+    "uvicorn[standard]>=0.30",
+    "python-multipart>=0.0.9",
+    "sse-starlette>=2.0",
     
     # Data Processing
-    "pandas==2.2.0",
-    "numpy==2.0.0",
-    "scipy==1.13.0",
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "scipy>=1.11",
     
     # NLP & Text Processing
-    "nltk==3.9.1",
-    "spacy==3.8.0",
-    "sentence-transformers==3.3.0",
+    "nltk>=3.8",
+    "spacy>=3.7",
+    "sentence-transformers>=3.0",
     
     # Visualization
-    "matplotlib==3.9.0",
-    "seaborn==0.13.0",
-    "plotly==5.24.0",
+    "matplotlib>=3.8",
+    "seaborn>=0.13",
+    "plotly>=5.0",
     
     # Logging & Monitoring
-    "loguru==0.7.2",
-    "python-json-logger==2.0.7",
+    "loguru>=0.7",
+    "python-json-logger>=2.0",
     
     # Async & Concurrency
-    "aiohttp==3.11.0",
-    "httpx==0.28.0",
-    "tenacity==9.0.0",
+    "aiohttp>=3.9",
+    "httpx>=0.27",
+    "tenacity>=8.0",
     
     # CLI & Progress
-    "click==8.1.7",
-    "rich==13.7.1",
-    "tqdm==4.67.0",
+    "click>=8.0",
+    "rich>=13.0",
+    "tqdm>=4.65",
     
     # Jupyter Support
-    "jupyter==1.1.1",
-    "jupyterlab==4.3.0",
-    "ipykernel==6.29.5",
-    "ipywidgets==8.1.0",
-    "notebook==7.3.0",
-    "nest-asyncio==1.6.0",
+    "jupyter>=1.0",
+    "jupyterlab>=4.0",
+    "ipykernel>=6.29",
+    "ipywidgets>=8.0",
+    "notebook>=7.0",
+    "nest-asyncio>=1.6",
     
     # Utils
-    "python-dateutil==2.9.0",
-    "pytz==2025.2",
-    "pyyaml==6.0.2",
-    "toml==0.10.2",
+    "python-dateutil>=2.8",
+    "pytz>=2024.1",
+    "pyyaml>=6.0",
+    "toml>=0.10",
     
     # Development Tools
-    "ipython==8.30.0",
-    "ipdb==0.13.13",
+    "ipython>=8.0",
+    "ipdb>=0.13",
 ]
 
 [project.optional-dependencies]
 dev = [
     # Testing
-    "pytest==8.4.0",
-    "pytest-asyncio==0.25.0",
-    "pytest-cov==6.0.0",
-    "pytest-mock==3.14.0",
-    "pytest-timeout==2.3.0",
-    "faker==33.0.0",
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5.0",
+    "pytest-mock>=3.12",
+    "pytest-timeout>=2.3",
+    "faker>=20.0",
     
     # Code Quality
-    "black==24.10.0",
-    "isort==5.13.0",
-    "flake8==7.1.0",
-    "mypy==1.13.0",
-    "pylint==3.3.0",
+    "black>=24.0",
+    "isort>=5.13",
+    "flake8>=7.0",
+    "mypy>=1.8",
+    "pylint>=3.0",
 ]
 
 docs = [
     # Documentation
-    "mkdocs==1.6.0",
-    "mkdocs-material==9.5.0",
+    "mkdocs>=1.5",
+    "mkdocs-material>=9.5",
 ]
 
 [project.scripts]
@@ -113,19 +113,22 @@ rag-cli = "cli:cli"
 requires = ["hatchling"]
 build-backend = "hatchling.build"
 
-[tool.uv]
-dev-dependencies = [
-    "pytest>=8.4.0",
-    "pytest-asyncio>=0.25.0",
-    "pytest-cov>=6.0.0",
-    "pytest-mock>=3.14.0",
-    "pytest-timeout>=2.3.0",
-    "faker>=33.0.0",
-    "black>=24.10.0",
-    "isort>=5.13.0",
-    "flake8>=7.1.0",
-    "mypy>=1.13.0",
-    "pylint>=3.3.0",
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5.0",
+    "pytest-mock>=3.12",
+    "pytest-timeout>=2.3",
+    "faker>=20.0",
+    "black>=24.0",
+    "isort>=5.13",
+    "flake8>=7.0",
+    "mypy>=1.8",
+    "pylint>=3.0",
 ]
 
 [tool.black]
