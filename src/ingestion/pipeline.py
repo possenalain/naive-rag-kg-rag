@@ -280,14 +280,17 @@ class IngestionPipeline:
                 for i, chunk in enumerate(chunks[:10]):
 
                         try:
-                            episode = await self.graph.add_episode(
+                            results = await self.graph.add_episode(
                                 name=f"{doc.title} - Chunk {chunk['chunk_index']}",
                                 content=chunk['chunk_text'],
                                 source_description=f"Chunk {chunk['chunk_index']} from document '{doc.title}' (source: {doc.source_path}, chunk_id: {chunk['chunk_id']}, document_id: {doc_id})"
                             )
                             entities_created += 1
                             
-                            # Link chunk to entities (simplified - Graphiti handles internally)
+                            # Link Chunk node to Episodic node so we can traverse Chunk->Episodic->Entity
+                            # AddEpisodeResults has an 'episode' field which is the EpisodicNode
+                            await self.graph.link_chunk_to_episodic(chunk['chunk_id'], results.episode.uuid)
+                            
                             logger.debug(f"Added episode for chunk {chunk['chunk_id']}")
                         except Exception as e:
                             error_msg = str(e).lower()

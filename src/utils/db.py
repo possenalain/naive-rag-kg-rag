@@ -248,7 +248,8 @@ class DatabaseManager:
             JOIN documents d ON c.document_id = d.document_id
         """
         
-        params = [query_embedding]
+        # Convert embedding list to string format for PostgreSQL
+        params = [str(query_embedding)]
         
         # Optional document filter
         if document_ids:

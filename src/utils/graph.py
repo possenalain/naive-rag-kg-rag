@@ -23,6 +23,7 @@ from graphiti_core.edges import EntityEdge
 from graphiti_core.llm_client import LLMConfig
 from graphiti_core.llm_client.gemini_client import GeminiClient
 from graphiti_core.embedder.gemini import GeminiEmbedder, GeminiEmbedderConfig
+from graphiti_core.graphiti import AddEpisodeResults
 
 from config.settings import get_settings
 
@@ -186,15 +187,18 @@ class GraphDatabaseManager:
         name: str,
         content: str,
         source_description: str
-    ) -> EpisodicNode:
+    ) -> AddEpisodeResults:
         """
         Add an episode (document chunk) to the knowledge graph using Graphiti.
         Graphiti will extract entities and relationships automatically.
         
         Note: Graphiti does not support metadata parameter in add_episode.
         Use source_description to provide context about the episode.
+        
+        Returns:
+            AddEpisodeResults containing the episode, entities, and relationships
         """
-        episode = await self.graphiti.add_episode(
+        results = await self.graphiti.add_episode(
             name=name,
             episode_body=content,
             source=EpisodeType.text,
@@ -202,7 +206,7 @@ class GraphDatabaseManager:
             reference_time=datetime.now()
         )
         logger.debug(f"Added episode: {name}")
-        return episode
+        return results
     
     async def search_entities(
         self,
@@ -212,7 +216,7 @@ class GraphDatabaseManager:
         """Search for entities semantically using Graphiti."""
         entities = await self.graphiti.search(
             query=query,
-            limit=limit
+            num_results=limit
         )
         logger.debug(f"Found {len(entities)} entities for query: {query}")
         return entities
@@ -374,6 +378,34 @@ class GraphDatabaseManager:
         logger.debug(f"Linked chunk {chunk_id} to {links} entities")
         return links
     
+    async def link_chunk_to_episodic(
+        self,
+        chunk_id: int,
+        episodic_uuid: str
+    ) -> bool:
+        """Link a chunk to its corresponding episodic node."""
+        query = """
+            MATCH (c:Chunk {chunk_id: $chunk_id})
+            MATCH (ep:Episodic {uuid: $episodic_uuid})
+            MERGE (c)-[r:HAS_EPISODE]->(ep)
+            RETURN count(r) as links_created
+        """
+        
+        async with self.driver.session() as session:
+            result = await session.run(
+                query,
+                chunk_id=chunk_id,
+                episodic_uuid=episodic_uuid
+            )
+            record = await result.single()
+        
+        success = record['links_created'] > 0
+        if success:
+            logger.debug(f"Linked chunk {chunk_id} to episodic {episodic_uuid}")
+        else:
+            logger.warning(f"Failed to link chunk {chunk_id} to episodic {episodic_uuid}")
+        return success
+    
     # ===== Knowledge Graph RAG Queries =====
     
     async def kg_retrieve(
@@ -388,21 +420,35 @@ class GraphDatabaseManager:
         2. Traverse to connected chunks
         3. Rank by relevance
         """
-        # Step 1: Search for relevant entities
-        entities = await self.search_entities(query_text, limit=top_k * 2)
+        # Step 1: Search for relevant entities (Graphiti returns edges/relationships)
+        search_results = await self.search_entities(query_text, limit=top_k * 2)
         
-        if not entities:
+        if not search_results:
             logger.warning("No entities found for query")
             return []
         
-        entity_ids = [entity.uuid for entity in entities]
+        # Extract unique entity UUIDs from edges (relationships between entities)
+        entity_ids = set()
+        for result in search_results:
+            # Graphiti search returns EntityEdge objects
+            if hasattr(result, 'source_node_uuid'):
+                entity_ids.add(result.source_node_uuid)
+            if hasattr(result, 'target_node_uuid'):
+                entity_ids.add(result.target_node_uuid)
+            # If it's actually an EntityNode, use its UUID directly
+            elif hasattr(result, 'uuid') and hasattr(result, 'name'):
+                entity_ids.add(result.uuid)
         
-        # Step 2: Get chunks connected to these entities
+        entity_ids = list(entity_ids)
+        logger.info(f"Extracted {len(entity_ids)} unique entity UUIDs from search results")
+        
+        # Step 2: Get chunks connected to these entities via Episodic nodes
+        # Path: Chunk -[:HAS_EPISODE]-> Episodic -[:MENTIONS]-> Entity
         query = """
-            UNWIND $entity_ids as entity_id
-            MATCH (e:Entity)
-            WHERE elementId(e) = entity_id
-            MATCH (e)<-[:HAS_ENTITY]-(c:Chunk)
+            UNWIND $entity_ids as entity_uuid
+            MATCH (e:Entity {uuid: entity_uuid})
+            MATCH (e)<-[:MENTIONS]-(ep:Episodic)
+            MATCH (c:Chunk)-[:HAS_EPISODE]->(ep)
             WITH DISTINCT c, COUNT(DISTINCT e) as entity_count
             ORDER BY entity_count DESC
             LIMIT $top_k
@@ -416,7 +462,7 @@ class GraphDatabaseManager:
         async with self.driver.session() as session:
             result = await session.run(
                 query,
-                entity_ids=entity_ids,
+                entity_ids=entity_ids,  # Now these are UUIDs
                 top_k=top_k
             )
             records = await result.data()
