@@ -249,8 +249,7 @@ class IngestionPipeline:
                     'chunk_id': c['chunk_id'],
                     'chunk_text': c['chunk_text'],
                     'document_id': c['document_id'],
-                    'chunk_index': c['chunk_index'],
-                    'metadata': {}
+                    'chunk_index': c['chunk_index']
                 }
                 for c in stored_chunks
             ]
@@ -278,23 +277,27 @@ class IngestionPipeline:
                     continue
                 
                 # Add episodes to Graphiti (max 10 per doc to avoid overwhelming)
-                for chunk in chunks[:10]:
-                    try:
-                        episode = await self.graph.add_episode(
-                            name=f"{doc.title} - Chunk {chunk['chunk_index']}",
-                            content=chunk['chunk_text'],
-                            source=doc.source_path,
-                            source_description=f"Chunk from document: {doc.title}",
-                            metadata={'chunk_id': chunk['chunk_id'], 'document_id': doc_id}
-                        )
-                        entities_created += 1
-                        
-                        # Link chunk to entities (simplified - Graphiti handles internally)
-                        logger.debug(f"Added episode for chunk {chunk['chunk_id']}")
-                        
-                    except Exception as e:
-                        logger.warning(f"Error adding episode for chunk {chunk['chunk_id']}: {e}")
-                        continue
+                for i, chunk in enumerate(chunks[:10]):
+
+                        try:
+                            episode = await self.graph.add_episode(
+                                name=f"{doc.title} - Chunk {chunk['chunk_index']}",
+                                content=chunk['chunk_text'],
+                                source_description=f"Chunk {chunk['chunk_index']} from document '{doc.title}' (source: {doc.source_path}, chunk_id: {chunk['chunk_id']}, document_id: {doc_id})"
+                            )
+                            entities_created += 1
+                            
+                            # Link chunk to entities (simplified - Graphiti handles internally)
+                            logger.debug(f"Added episode for chunk {chunk['chunk_id']}")
+                        except Exception as e:
+                            error_msg = str(e).lower()
+                            if "rate limit" in error_msg:
+                                logger.warning(f"Rate limit hit when adding episode for chunk {chunk['chunk_id']}")
+                                logger.error(f"{e}")
+                                break
+                            else:
+                                logger.warning(f"Error adding episode for chunk {chunk['chunk_id']}: {e}")
+                                continue 
             
             logger.info(f"Entity extraction complete: {entities_created} episodes added")
             

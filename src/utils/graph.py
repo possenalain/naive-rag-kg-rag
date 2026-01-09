@@ -10,7 +10,7 @@ from neo4j.exceptions import ServiceUnavailable
 import logging
 from datetime import datetime
 from graphiti_core import Graphiti
-from graphiti_core.nodes import EntityNode, EpisodicNode
+from graphiti_core.nodes import EntityNode, EpisodicNode, EpisodeType
 from graphiti_core.edges import EntityEdge
 from graphiti_core.llm_client import LLMConfig
 from graphiti_core.llm_client.gemini_client import GeminiClient
@@ -177,21 +177,21 @@ class GraphDatabaseManager:
         self,
         name: str,
         content: str,
-        source: str,
-        source_description: str,
-        metadata: Optional[Dict[str, Any]] = None
+        source_description: str
     ) -> EpisodicNode:
         """
         Add an episode (document chunk) to the knowledge graph using Graphiti.
         Graphiti will extract entities and relationships automatically.
+        
+        Note: Graphiti does not support metadata parameter in add_episode.
+        Use source_description to provide context about the episode.
         """
         episode = await self.graphiti.add_episode(
             name=name,
             episode_body=content,
-            source=source,
+            source=EpisodeType.text,
             source_description=source_description,
-            reference_time=datetime.now(),
-            metadata=metadata or {}
+            reference_time=datetime.now()
         )
         logger.debug(f"Added episode: {name}")
         return episode
