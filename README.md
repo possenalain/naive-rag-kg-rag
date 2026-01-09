@@ -2,6 +2,13 @@
 
 A comprehensive benchmarking system to compare and evaluate three Retrieval-Augmented Generation (RAG) approaches for multi-hop question answering.
 
+> 🚀 **Now using [UV](https://github.com/astral-sh/uv)** - A blazingly fast Python package manager (10-100x faster than pip)!
+>
+> 📚 **Setup Guides**:
+> - [UV_MIGRATION.md](UV_MIGRATION.md) - UV usage and benefits
+> - [SETUP_GUIDE.md](SETUP_GUIDE.md) - Complete setup instructions
+> - [QUICKSTART.md](QUICKSTART.md) - Quick start in 10 minutes
+
 ## 🎯 Project Goals
 
 Quantitatively compare three RAG architectures:
@@ -101,12 +108,36 @@ naive-rag-kg-rag/
 ### Prerequisites
 
 - Python 3.11+
+- [UV](https://github.com/astral-sh/uv) (fast Python package installer) - **Recommended**
 - Docker & Docker Compose
 - 8GB+ RAM
 - (Optional) NVIDIA GPU for local LLMs
 
 ### 1. Clone and Setup
 
+**With UV (Recommended - 10x faster)**:
+```bash
+# Install UV if not already installed
+# Windows PowerShell:
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+# Linux/macOS:
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Navigate to project directory
+cd naive-rag-kg-rag
+
+# Create virtual environment and install dependencies
+uv venv
+uv sync --all-extras
+
+# Activate virtual environment
+# Windows PowerShell:
+.venv\Scripts\Activate.ps1
+# Linux/Mac:
+source .venv/bin/activate
+```
+
+**Traditional pip method** (if UV not available):
 ```bash
 # Navigate to project directory
 cd naive-rag-kg-rag
@@ -123,6 +154,8 @@ source venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 ```
+
+> 💡 **Tip**: See [UV_MIGRATION.md](UV_MIGRATION.md) for detailed UV usage and migration guide.
 
 ### 2. Configure Environment
 
@@ -151,23 +184,33 @@ python -m src.utils.graph init
 ### 4. Ingest Documents
 
 ```bash
-# Ingest sample documents
-python -m src.ingestion.pipeline \
+# With UV (recommended):
+uv run python -m src.ingestion.pipeline \
     --input-dir ./data/documents \
     --embedding-provider gemini \
     --build-graph
 
 # Check ingestion status
-python -m src.ingestion.pipeline --status
-```
+uv run python -m src.ingestion.pipeline --status
 
-### 5. Run Evaluation
-
-```bash
+# Or with activated venv:
+python -m src.ingestion.pipeline \
+    --input-dir ./data/documents \
+    --embedding-provider gemini \
+  With UV (recommended):
 # Run benchmark evaluation
-python -m src.evaluation.orchestrator \
+uv run python -m src.evaluation.orchestrator \
     --dataset hotpotqa \
     --num-questions 50 \
+    --output ./benchmarks/results
+
+# Score results with LLM
+uv run python -m src.evaluation.scorer \
+    --answers ./benchmarks/results/answers.json \
+    --output ./benchmarks/results/scores.json
+
+# Or with activated venv:
+python -m src.evaluation.orchestrator --dataset hotpotqa --num-questions 50
     --output ./benchmarks/results
 
 # Score results with LLM
@@ -175,19 +218,27 @@ python -m src.evaluation.scorer \
     --answers ./benchmarks/results/answers.json \
     --output ./benchmarks/results/scores.json
 ```
-
-### 6. Analyze Results
-
-```bash
+With UV (recommended):
 # Generate statistical analysis
-python -m src.analysis.statistics \
+uv run python -m src.analysis.statistics \
     --scores ./benchmarks/results/scores.json \
     --output ./benchmarks/results/analysis_report.md
 
 # Generate visualizations
-python -m src.analysis.visualizations \
+uv run python -m src.analysis.visualizations \
     --scores ./benchmarks/results/scores.json \
     --output-dir ./benchmarks/results/figures
+
+# Or with activated venv:
+python -m src.analysis.statistics --scores ./benchmarks/results/scores.json
+```
+
+Or use Jupyter notebooks:
+```bash
+# With UV:
+uv run jupyter lab notebooks/
+
+# Or with activated venv:utput-dir ./benchmarks/results/figures
 ```
 
 Or use Jupyter notebooks:
@@ -196,6 +247,46 @@ jupyter lab notebooks/
 ```
 
 ## 🔧 Configuration
+
+### Helper Scripts
+
+For convenience, use the provided helper scripts:
+
+**Windows (PowerShell)**:
+```powershell
+# Show all available commands
+.\make.ps1 help
+
+# Complete setup
+.\make.ps1 setup
+
+# Run tests
+.\make.ps1 test
+
+# Format code
+.\make.ps1 format
+
+# Start Docker services
+.\make.ps1 docker-up
+```
+
+**Linux/macOS (Makefile)**:
+```bash
+# Show all available commands
+make help
+
+# Complete setup
+make setup
+
+# Run tests
+make test
+
+# Format code
+make format
+
+# Start Docker services
+make docker-up
+```
 
 ### Environment Variables
 
