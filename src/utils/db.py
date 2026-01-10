@@ -233,43 +233,58 @@ class DatabaseManager:
         Returns:
             List of chunks with similarity scores
         """
-        # Base query with cosine similarity
+        # Convert embedding list to PostgreSQL vector format string
+        embedding_str = '[' + ','.join(str(x) for x in query_embedding) + ']'
+        
+        # Use a subquery to avoid PostgreSQL recalculating the distance in WHERE clause
+        # This significantly improves performance
         query = """
-            SELECT 
-                c.chunk_id,
-                c.document_id,
-                c.chunk_text,
-                c.chunk_index,
-                c.metadata,
-                d.title as document_title,
-                d.source_path,
-                1 - (c.embedding <=> $1::vector) as similarity_score
-            FROM chunks c
-            JOIN documents d ON c.document_id = d.document_id
+            WITH ranked_chunks AS (
+                SELECT 
+                    c.chunk_id,
+                    c.document_id,
+                    c.chunk_text,
+                    c.chunk_index,
+                    c.metadata,
+                    1 - (c.embedding <=> $1::vector) as similarity_score
+                FROM chunks c
         """
         
-        # Convert embedding list to string format for PostgreSQL
-        params = [str(query_embedding)]
+        params = [embedding_str]
         
-        # Optional document filter
+        # Optional document filter in the CTE
         if document_ids:
-            query += f" WHERE c.document_id = ANY($2)"
+            query += " WHERE c.document_id = ANY($2)"
             params.append(document_ids)
         
-        # Similarity threshold and ordering
-        where_clause = "WHERE" if not document_ids else "AND"
-        query += f"""
-            {where_clause} (1 - (c.embedding <=> $1::vector)) >= ${len(params) + 1}
-            ORDER BY c.embedding <=> $1::vector
-            LIMIT ${len(params) + 2}
-        """
+        # Complete the CTE and join with documents
+        query += """
+            )
+            SELECT 
+                rc.chunk_id,
+                rc.document_id,
+                rc.chunk_text,
+                rc.chunk_index,
+                rc.metadata,
+                d.title as document_title,
+                d.source_path,
+                rc.similarity_score
+            FROM ranked_chunks rc
+            JOIN documents d ON rc.document_id = d.document_id
+            WHERE rc.similarity_score >= $""" + str(len(params) + 1) + """
+            ORDER BY rc.similarity_score DESC
+            LIMIT $""" + str(len(params) + 2)
+        
         params.extend([similarity_threshold, top_k])
+        
+        # Debug logging
+        logger.info(f"Vector search with similarity_threshold={similarity_threshold}, top_k={top_k}")
         
         async with self.connection() as conn:
             rows = await conn.fetch(query, *params)
         
+        logger.info(f"Vector search returned {len(rows)} rows")
         results = [dict(row) for row in rows]
-        logger.debug(f"Vector search returned {len(results)} results")
         return results
     
     async def hybrid_search(
