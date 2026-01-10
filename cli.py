@@ -205,6 +205,133 @@ def reset():
 
 
 @cli.command()
+@click.option('--name', default=None, help='Custom backup name')
+@click.option('--postgres-only', is_flag=True, help='Backup PostgreSQL only')
+@click.option('--neo4j-only', is_flag=True, help='Backup Neo4j only')
+def backup(name, postgres_only, neo4j_only):
+    """Create backup of databases.
+    
+    Backups are stored in ./db/backups/ directory.
+    """
+    async def run():
+        from src.utils.backup import backup_postgres, backup_neo4j
+        
+        backup_dir = Path('./db/backups')
+        
+        click.echo("\n" + "="*80)
+        click.echo("DATABASE BACKUP")
+        click.echo("="*80 + "\n")
+        
+        # Backup PostgreSQL
+        if not neo4j_only:
+            try:
+                await backup_postgres(backup_dir, name)
+            except Exception as e:
+                click.echo(f"✗ PostgreSQL backup failed: {e}", err=True)
+                if not postgres_only:
+                    click.echo("Continuing with Neo4j backup...")
+        
+        # Backup Neo4j
+        if not postgres_only:
+            try:
+                click.echo("")
+                await backup_neo4j(backup_dir, name)
+            except Exception as e:
+                click.echo(f"✗ Neo4j backup failed: {e}", err=True)
+        
+        click.echo("\n" + "="*80)
+        click.echo(f"✓ Backups saved to: {backup_dir.absolute()}")
+        click.echo("="*80)
+    
+    asyncio.run(run())
+
+
+@cli.command()
+@click.option('--postgres-backup', type=click.Path(exists=True), help='PostgreSQL backup file (.sql)')
+@click.option('--neo4j-backup', type=click.Path(exists=True), help='Neo4j backup file (.cypher)')
+@click.option('--list-backups', is_flag=True, help='List available backups')
+@click.confirmation_option(prompt='Are you sure? This will replace current data.')
+def restore(postgres_backup, neo4j_backup, list_backups):
+    """Restore databases from backup.
+    
+    Examples:
+        # List available backups
+        python cli.py restore --list-backups
+        
+        # Restore both databases
+        python cli.py restore --postgres-backup db/backups/postgres_backup_20260110.sql --neo4j-backup db/backups/neo4j_backup_20260110.cypher
+        
+        # Restore only PostgreSQL
+        python cli.py restore --postgres-backup db/backups/postgres_backup_20260110.sql
+    """
+    async def run():
+        from src.utils.backup import restore_postgres, restore_neo4j, list_backups as list_backup_files
+        
+        backup_dir = Path('./db/backups')
+        
+        # List backups if requested
+        if list_backups:
+            click.echo("\n" + "="*80)
+            click.echo("AVAILABLE BACKUPS")
+            click.echo("="*80 + "\n")
+            
+            backups = await list_backup_files(backup_dir)
+            
+            if not backups:
+                click.echo("No backups found in ./db/backups/")
+                return
+            
+            for backup in backups:
+                click.echo(f"Name: {backup.get('backup_name')}")
+                click.echo(f"Time: {backup.get('backup_time')}")
+                
+                if 'document_count' in backup:
+                    click.echo(f"Type: PostgreSQL")
+                    click.echo(f"  Documents: {backup.get('document_count')}")
+                    click.echo(f"  Chunks: {backup.get('chunk_count')}")
+                else:
+                    click.echo(f"Type: Neo4j")
+                    click.echo(f"  Nodes: {backup.get('node_count')}")
+                    click.echo(f"  Entities: {backup.get('entity_count')}")
+                
+                click.echo("")
+            
+            return
+        
+        # Restore from backups
+        if not postgres_backup and not neo4j_backup:
+            click.echo("Error: Specify --postgres-backup and/or --neo4j-backup", err=True)
+            click.echo("Or use --list-backups to see available backups")
+            return
+        
+        click.echo("\n" + "="*80)
+        click.echo("DATABASE RESTORE")
+        click.echo("="*80 + "\n")
+        
+        # Restore PostgreSQL
+        if postgres_backup:
+            try:
+                await restore_postgres(Path(postgres_backup))
+            except Exception as e:
+                click.echo(f"✗ PostgreSQL restore failed: {e}", err=True)
+        
+        # Restore Neo4j
+        if neo4j_backup:
+            try:
+                if postgres_backup:
+                    click.echo("")
+                await restore_neo4j(Path(neo4j_backup))
+            except Exception as e:
+                click.echo(f"✗ Neo4j restore failed: {e}", err=True)
+        
+        click.echo("\n" + "="*80)
+        click.echo("✓ Restore complete!")
+        click.echo("="*80)
+    
+    asyncio.run(run())
+
+
+@cli.command()
 @click.argument('result_files', nargs=-1, type=click.Path(exists=True), required=True)
 @click.option('--output-dir', default='./benchmarks/results', help='Output directory for figures and CSVs')
 @click.option('--show-plots/--no-show-plots', default=False, help='Display plots interactively')

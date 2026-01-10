@@ -647,3 +647,28 @@ MIT License - see LICENSE file for details
 **Current Phase**: Planning & Architecture Complete
 
 **Next Steps**: Begin Phase 1 implementation (Foundation & Infrastructure Setup)
+
+
+## frequent commands
+
+```bash
+#  reset and ingest --subset
+echo y | uv run python cli.py reset; uv run python cli.py ingest .\data\big_tech_docs
+
+# all
+uv run python cli.py reset; uv run python cli.py ingest .\data\datasets 
+
+# evaluate 10 questions
+uv run python cli.py evaluate --num-questions -1 --dataset big_tech_curated --output-dir .\benchmarks\big_tech_curated_results
+
+# analyze results
+uv run python cli.py analyze .\benchmarks\big_tech_curated_results\eval_*.json --output-dir ./benchmarks/big_tech_curated_results
+
+## env  related
+make clean
+make setup
+mkae
+
+```
+
+

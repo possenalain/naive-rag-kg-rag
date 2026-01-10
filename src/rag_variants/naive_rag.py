@@ -50,7 +50,7 @@ class NaiveRAG:
         self,
         query: str,
         top_k: Optional[int] = None,
-        similarity_threshold: float = 0.7
+        similarity_threshold: float = 0.5
     ) -> List[Dict[str, Any]]:
         """
         Retrieve relevant chunks using vector similarity.
