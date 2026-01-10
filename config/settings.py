@@ -84,7 +84,9 @@ class BenchmarkSettings(BaseSettings):
     
     model_config = SettingsConfigDict(env_prefix="BENCHMARK_", env_file=".env", extra="ignore")
     
-    dataset_name: str = Field(default="hotpotqa", description="Benchmark dataset name")
+    dataset_name: str = Field(default="factual_questions", description="Benchmark dataset name (without .json)")
+    dataset_path: Optional[str] = Field(default=None, description="Explicit path to benchmark JSON file")
+    datasets_dir: str = Field(default="./benchmarks/datasets", description="Directory containing benchmark datasets")
     num_questions: int = Field(default=50, ge=1, description="Number of questions to evaluate")
     batch_size: int = Field(default=10, ge=1, description="Batch size for processing")
     output_dir: str = Field(default="./benchmarks/results", description="Output directory")

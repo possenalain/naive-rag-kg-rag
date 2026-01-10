@@ -68,10 +68,11 @@ def ingest(directory, chunk_size, chunk_overlap, enable_kg, recursive):
 
 
 @cli.command()
-@click.option('--dataset', default='hotpotqa', help='Benchmark dataset name')
+@click.option('--dataset', default='factual_questions', help='Benchmark dataset name (without .json)')
+@click.option('--dataset-path', default=None, help='Explicit path to benchmark JSON file')
 @click.option('--num-questions', default=50, type=int, help='Number of questions')
 @click.option('--output-dir', default='./benchmarks/results', help='Output directory')
-def evaluate(dataset, num_questions, output_dir):
+def evaluate(dataset, dataset_path, num_questions, output_dir):
     """Run evaluation on benchmark dataset."""
     async def run():
         logger.info(f"Starting evaluation on {dataset}")
@@ -81,6 +82,7 @@ def evaluate(dataset, num_questions, output_dir):
         
         summary = await orchestrator.run_evaluation(
             dataset_name=dataset,
+            dataset_path=dataset_path,
             num_questions=num_questions,
             output_dir=output_dir
         )
@@ -163,10 +165,14 @@ def status():
         click.echo(f"  Graph Entities: {graph_stats.get('entity_count', 0)}")
         click.echo(f"  Entity Relations: {graph_stats.get('entity_relations', 0)}")
         
-        # Check for evaluations
-        evals = await db.get_evaluation_results()
-        if evals:
-            click.echo(f"  Evaluations: {len(evals)}")
+        # Check for evaluations (now in local files)
+        click.echo(f"\n  Evaluation: Results stored in local files")
+        results_dir = Path("./benchmarks/results")
+        if results_dir.exists():
+            eval_files = list(results_dir.glob("eval_*.json"))
+            click.echo(f"  Evaluation files: {len(eval_files)}")
+        else:
+            click.echo(f"  Evaluation files: 0")
     
     asyncio.run(run())
 

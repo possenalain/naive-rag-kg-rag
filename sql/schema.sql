@@ -73,8 +73,11 @@ CREATE INDEX idx_chunks_embedding ON chunks
 CREATE INDEX idx_chunks_content_trgm ON chunks USING gin(chunk_text gin_trgm_ops);
 
 -- =============================================================================
--- BENCHMARK QUESTIONS TABLE
+-- BENCHMARK QUESTIONS TABLE (OPTIONAL - evaluation now uses JSON files)
 -- Stores questions from benchmark datasets
+-- NOTE: The evaluation pipeline now loads questions from JSON files in 
+--       benchmarks/datasets/ and saves results locally instead of using the database.
+--       These tables are kept for backwards compatibility and optional database storage.
 -- =============================================================================
 CREATE TABLE benchmark_questions (
     id SERIAL PRIMARY KEY,
@@ -94,8 +97,10 @@ CREATE INDEX idx_benchmark_questions_dataset ON benchmark_questions(dataset_name
 CREATE INDEX idx_benchmark_questions_question_id ON benchmark_questions(question_id);
 
 -- =============================================================================
--- EVALUATIONS TABLE
+-- EVALUATIONS TABLE (OPTIONAL - results now saved to JSON files)
 -- Stores answers from all three RAG variants
+-- NOTE: Evaluation results are now saved to local JSON files in 
+--       benchmarks/results/ with format: eval_{timestamp}_{benchmark}.json
 -- =============================================================================
 CREATE TABLE evaluations (
     evaluation_id SERIAL PRIMARY KEY,
@@ -113,7 +118,7 @@ CREATE INDEX idx_evaluations_rag_variant ON evaluations(rag_variant);
 CREATE INDEX idx_evaluations_timestamp ON evaluations(timestamp DESC);
 
 -- =============================================================================
--- SCORES TABLE
+-- SCORES TABLE (OPTIONAL - results now saved to JSON files)
 -- Stores LLM-based scores for each answer
 -- =============================================================================
 CREATE TABLE scores (
