@@ -1,0 +1,37 @@
+================================================================================
+RAG EVALUATION REPORT
+================================================================================
+
+Dataset: big_tech_curated
+Evaluation ID: 20260110_152402_4a4a5720
+Timestamp: 2026-01-10T15:24:02.478494
+Number of Questions: 255
+
+
+--------------------------------------------------------------------------------
+METHOD COMPARISON
+--------------------------------------------------------------------------------
+ Rank (by Overall Score)     Method  Overall Score  Correctness  Completeness  Relevance  Faithfulness  Clarity  Avg Latency (ms)
+                       1  Naive Rag           4.81     4.784314      4.450980   4.976471      4.921569 4.941176           1660.69
+                       2 Hybrid Rag           4.78     4.768627      4.349020   4.968627      4.890196 4.929412           1768.81
+                       3     Kg Rag           4.28     3.843137      3.556863   4.556863      4.568627 4.866667           1935.00
+
+
+--------------------------------------------------------------------------------
+DETAILED STATISTICS
+--------------------------------------------------------------------------------
+    method  latency_ms_mean  latency_ms_std  latency_ms_min  latency_ms_max  num_chunks_mean  num_chunks_std  num_chunks_min  num_chunks_max  correctness_mean  correctness_std  completeness_mean  completeness_std  relevance_mean  relevance_std  faithfulness_mean  faithfulness_std  clarity_mean  clarity_std  avg_score_mean  avg_score_std
+Hybrid Rag          1768.81          901.99          813.16         5847.21             5.00            0.00               5               5              4.77             0.72               4.35              0.91            4.97           0.29               4.89              0.48          4.93         0.26            4.78           0.43
+    Kg Rag          1935.00         1065.37          818.90         5581.03             5.00            0.00               5               5              3.84             1.69               3.56              1.60            4.56           1.14               4.57              1.14          4.87         0.37            4.28           0.96
+ Naive Rag          1660.69          965.12            0.00         4744.20             4.87            0.62               0               5              4.78             0.76               4.45              0.87            4.98           0.28               4.92              0.44          4.94         0.24            4.81           0.40
+
+
+--------------------------------------------------------------------------------
+KEY INSIGHTS
+--------------------------------------------------------------------------------
+• Best performing method: Naive Rag (score: 4.81)
+• Fastest method: Naive Rag (1660.69 ms)
+• Latency range: 274.31 ms
+• Score range: 0.53 points
+
+================================================================================

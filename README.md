@@ -659,11 +659,10 @@ echo y | uv run python cli.py reset; uv run python cli.py ingest .\data\big_tech
 uv run python cli.py reset; uv run python cli.py ingest .\data\datasets 
 
 # evaluate 10 questions
-uv run python cli.py evaluate --num-questions 10 --dataset factual_questions --output-dir .\benchmarks\factual_results
+uv run python cli.py evaluate --num-questions -1 --dataset big_tech_curated --output-dir .\benchmarks\big_tech_curated_results
 
 # analyze results
-uv run python cli.py analyze .\benchmarks\factual_results\eval_*.json
-
+uv run python cli.py analyze .\benchmarks\big_tech_curated_results\eval_*.json --output-dir ./benchmarks/big_tech_curated_results
 
 ## env  related
 make clean

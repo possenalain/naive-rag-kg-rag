@@ -218,7 +218,7 @@ class DatabaseManager:
         self,
         query_embedding: List[float],
         top_k: int = 5,
-        similarity_threshold: float = 0.7,
+        similarity_threshold: float = 0.5,
         document_ids: Optional[List[int]] = None
     ) -> List[Dict[str, Any]]:
         """
