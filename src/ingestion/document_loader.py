@@ -20,13 +20,13 @@ class Document:
     title: str
     source_path: str
     content: str
-    metadata: Dict[str, Any]
+    metadata: Dict[str, Any] = None
     
     def __post_init__(self):
         """Validate document fields."""
         if not self.title:
             self.title = Path(self.source_path).stem
-        if not self.metadata:
+        if self.metadata is None:
             self.metadata = {}
         self.metadata.setdefault('load_time', datetime.utcnow().isoformat())
         self.metadata.setdefault('char_count', len(self.content))

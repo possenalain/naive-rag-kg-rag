@@ -6,18 +6,59 @@ Get up and running with the RAG benchmarking system in under 10 minutes!
 
 Before you begin, ensure you have:
 - ✅ Python 3.11 or higher
+- ✅ [UV](https://github.com/astral-sh/uv) - Fast Python package installer (recommended)
 - ✅ Docker and Docker Compose
 - ✅ At least 8GB RAM
 - ✅ API key for Gemini (or OpenAI, or plan to use Ollama)
 
 ## Step-by-Step Setup
 
-### 1. Environment Setup (2 minutes)
+### 1. Install UV (1 minute)
+
+UV is a fast Python package installer that's 10-100x faster than pip.
+
+**Windows PowerShell**:
+```powershell
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+```
+
+**Linux/macOS**:
+```bash
+curl -LsSf https://astral.sh/uv/install.sh | sh
+```
+
+**Verify Installation**:
+```bash
+uv --version
+```
+
+### 2. Environment Setup (1 minute)
 
 ```bash
 # Navigate to project directory
 cd naive-rag-kg-rag
 
+# Create virtual environment with UV
+uv venv
+
+# Activate the environment
+# Windows PowerShell:
+.venv\Scripts\Activate.ps1
+
+# Windows Command Prompt:
+.venv\Scripts\activate.bat
+
+# Linux/Mac:
+source .venv/bin/activate
+
+# Install all dependencies (this is fast with UV!)
+uv sync --all-extras
+```
+
+<details>
+<summary>Alternative: Traditional pip method (slower)</summary>
+
+```bash
 # Create and activate virtual environment
 python -m venv venv
 
@@ -30,8 +71,9 @@ source venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 ```
+</details>
 
-### 2. Configure Environment (2 minutes)
+### 3. Configure Environment (2 minutes)
 
 ```bash
 # Copy environment template
@@ -63,7 +105,7 @@ EMBEDDING_MODEL_NAME=text-embedding-004
 EMBEDDING_API_KEY=YOUR_GEMINI_API_KEY
 ```
 
-### 3. Start Infrastructure (3 minutes)
+### 4. Start Infrastructure (3 minutes)
 
 ```bash
 # Start PostgreSQL and Neo4j
@@ -87,7 +129,7 @@ docker exec rag_postgres pg_isready -U raguser
 # Login: neo4j / <your NEO4J_PASSWORD>
 ```
 
-### 4. Initialize Databases (1 minute)
+### 5. Initialize Databases (1 minute)
 
 The PostgreSQL schema is automatically initialized on first start via `sql/schema.sql`.
 
@@ -99,7 +141,7 @@ docker exec -it rag_postgres psql -U raguser -d rag_benchmark -c "\dt"
 # Should show: documents, chunks, benchmark_questions, evaluations, scores
 ```
 
-### 5. Quick Test (2 minutes)
+### 6. Quick Test (2 minutes)
 
 Create a test script to verify everything works:
 
@@ -138,6 +180,10 @@ if __name__ == "__main__":
 
 Run it:
 ```bash
+# With UV:
+uv run python test_setup.py
+
+# Or with activated venv:
 python test_setup.py
 ```
 
@@ -147,15 +193,25 @@ python test_setup.py
 
 ```bash
 # Once implementation is complete, you'll run:
-python -m src.ingestion.pipeline \
+# With UV:
+uv run python -m src.ingestion.pipeline \
     --input-dir ./data/documents \
     --build-graph
+
+# Or with activated venv:
+python -m src.ingestion.pipeline --input-dir ./data/documents --build-graph
 ```
 
 ### Option B: Run Sample Evaluation (Not Yet Implemented)
 
 ```bash
 # Once implementation is complete:
+# With UV:
+uv run python -m src.evaluation.orchestrator --dataset hotpotqa
+
+# Or with activated venv:
+python -m src.evaluation.orchestrator --dataset hotpotqa
+```
 python -m src.evaluation.orchestrator \
     --dataset hotpotqa \
     --num-questions 10 \
@@ -170,6 +226,28 @@ Recommended starting points:
 1. **Configuration Management** (`config/settings.py`)
 2. **Database Utilities** (`src/utils/db.py`)
 3. **Document Loader** (`src/ingestion/loader.py`)
+
+## UV Quick Reference
+
+```bash
+# Add a new dependency
+uv add package-name
+
+# Add a dev dependency
+uv add --dev package-name
+
+# Run scripts without activating venv
+uv run python script.py
+uv run pytest
+
+# Update all dependencies
+uv sync --upgrade
+
+# See all UV commands
+uv --help
+```
+
+For more UV details, see [UV_MIGRATION.md](UV_MIGRATION.md).
 
 ## Common Issues
 

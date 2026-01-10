@@ -1,6 +1,7 @@
 """
 Evaluation orchestrator coordinating RAG benchmarking.
 Runs all three variants and collects comprehensive metrics.
+Loads questions from JSON files and saves results locally.
 """
 
 import asyncio
@@ -9,12 +10,12 @@ import logging
 from datetime import datetime
 from pathlib import Path
 import json
+import uuid
 
 from src.rag_variants.naive_rag import NaiveRAG
 from src.rag_variants.kg_rag import KnowledgeGraphRAG
 from src.rag_variants.hybrid_rag import HybridRAG
 from src.evaluation.llm_scorer import LLMScorer
-from src.utils.db import get_db
 from config.settings import get_settings
 
 logger = logging.getLogger(__name__)
@@ -26,10 +27,10 @@ class EvaluationOrchestrator:
     Orchestrates comprehensive RAG evaluation.
     
     Workflow:
-    1. Load benchmark questions
+    1. Load benchmark questions from JSON file
     2. Run all three RAG variants
     3. Score answers using LLM
-    4. Store results in database
+    4. Save results to local JSON file
     5. Generate summary statistics
     """
     
@@ -38,7 +39,7 @@ class EvaluationOrchestrator:
         self.kg_rag = KnowledgeGraphRAG()
         self.hybrid_rag = HybridRAG()
         self.scorer = LLMScorer()
-        self.db = None
+        self.eval_id = None
     
     async def initialize(self):
         """Initialize all components."""
@@ -48,13 +49,16 @@ class EvaluationOrchestrator:
         await self.kg_rag.initialize()
         await self.hybrid_rag.initialize()
         await self.scorer.initialize()
-        self.db = await get_db()
+        
+        # Generate unique evaluation ID
+        self.eval_id = datetime.utcnow().strftime('%Y%m%d_%H%M%S') + "_" + str(uuid.uuid4())[:8]
         
         logger.info("Evaluation orchestrator initialized")
     
     async def run_evaluation(
         self,
-        dataset_name: str = "hotpotqa",
+        dataset_name: str = "factual_questions",
+        dataset_path: Optional[str] = None,
         num_questions: Optional[int] = None,
         output_dir: Optional[str] = None
     ) -> Dict[str, Any]:
@@ -62,23 +66,25 @@ class EvaluationOrchestrator:
         Run complete evaluation pipeline.
         
         Args:
-            dataset_name: Benchmark dataset name
+            dataset_name: Benchmark dataset name (without .json extension)
+            dataset_path: Explicit path to benchmark JSON file (overrides dataset_name)
             num_questions: Number of questions to evaluate (None = all)
             output_dir: Directory to save results
         
         Returns:
             Summary statistics
         """
-        if not self.db:
+        if self.eval_id is None:
             await self.initialize()
         
         start_time = datetime.utcnow()
         logger.info(f"Starting evaluation on dataset: {dataset_name}")
         
-        # Step 1: Load benchmark questions
-        questions = await self.db.get_benchmark_questions(
+        # Step 1: Load benchmark questions from JSON file
+        questions = self._load_questions_from_json(
             dataset_name=dataset_name,
-            limit=num_questions or settings.benchmark.num_questions
+            dataset_path=dataset_path,
+            num_questions=num_questions
         )
         
         if not questions:
@@ -112,25 +118,23 @@ class EvaluationOrchestrator:
                 'question': eval_item['question_text'],
                 'ground_truth': eval_item['ground_truth'],
                 'generated_answer': eval_item['generated_answer'],
-                'retrieved_chunks': eval_item['retrieved_chunks']
+                'retrieved_chunks': eval_item.get('retrieved_chunks', [])
             }
             for eval_item in all_evaluations
         ]
         
         scores = await self.scorer.batch_score(scoring_data)
         
-        # Step 4: Store scores in database
-        logger.info("Storing evaluation results...")
+        # Step 4: Attach scores to evaluations
+        logger.info("Attaching scores to evaluations...")
         for eval_item, score in zip(all_evaluations, scores):
-            # Store scores
-            await self.db.insert_scores(
-                evaluation_id=eval_item['evaluation_id'],
-                correctness=score['correctness'],
-                completeness=score['completeness'],
-                relevance=score['relevance'],
-                faithfulness=score['faithfulness'],
-                clarity=score['clarity'],
-                explanation={
+            eval_item['scores'] = {
+                'correctness': score['correctness'],
+                'completeness': score['completeness'],
+                'relevance': score['relevance'],
+                'faithfulness': score['faithfulness'],
+                'clarity': score['clarity'],
+                'explanations': {
                     'correctness': score.get('correctness_explanation', ''),
                     'completeness': score.get('completeness_explanation', ''),
                     'relevance': score.get('relevance_explanation', ''),
@@ -138,26 +142,37 @@ class EvaluationOrchestrator:
                     'clarity': score.get('clarity_explanation', ''),
                     'overall': score.get('overall_assessment', '')
                 }
-            )
+            }
         
         # Step 5: Compute summary statistics
         logger.info("Computing summary statistics...")
         summary = self._compute_summary(naive_results, kg_results, hybrid_results, scores)
         
-        # Step 6: Save results to file
-        if output_dir:
-            output_path = Path(output_dir) / f"evaluation_{dataset_name}_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.json"
-            output_path.parent.mkdir(parents=True, exist_ok=True)
-            
-            with open(output_path, 'w') as f:
-                json.dump(summary, f, indent=2)
-            logger.info(f"Results saved to: {output_path}")
+        # Step 6: Save results to local file
+        output_dir = output_dir or settings.benchmark.output_dir
+        results_data = {
+            'evaluation_id': self.eval_id,
+            'dataset_name': dataset_name,
+            'dataset_path': dataset_path,
+            'num_questions': len(questions),
+            'timestamp': start_time.isoformat(),
+            'summary': summary,
+            'detailed_results': {
+                'naive_rag': naive_results,
+                'kg_rag': kg_results,
+                'hybrid_rag': hybrid_results
+            }
+        }
+        
+        output_path = self._save_results(results_data, dataset_name, output_dir)
+        logger.info(f"Results saved to: {output_path}")
         
         end_time = datetime.utcnow()
         duration = (end_time - start_time).total_seconds()
         
         summary['duration_seconds'] = duration
         summary['status'] = 'success'
+        summary['output_path'] = str(output_path)
         
         logger.info(f"Evaluation complete in {duration:.2f}s")
         return summary
@@ -171,40 +186,44 @@ class EvaluationOrchestrator:
         """Run a single RAG variant on all questions."""
         results = []
         
-        for question_data in questions:
+        for idx, question_data in enumerate(questions):
             question_text = question_data['question_text']
-            question_id = question_data['id']
+            question_id = question_data.get('question_id', f"q_{idx}")
             
             try:
                 # Generate answer
                 result = await rag_system.generate(question_text)
                 
-                # Store evaluation
-                eval_id = await self.db.insert_evaluation(
-                    rag_variant=variant_name,
-                    question_id=question_id,
-                    generated_answer=result['answer'],
-                    retrieved_chunks=result['chunk_ids'],
-                    latency_ms=result['latency_ms'],
-                    metadata={
-                        'fusion_strategy': result.get('fusion_strategy'),
-                        'error': result.get('error')
-                    }
-                )
-                
-                results.append({
-                    'evaluation_id': eval_id,
+                # Create evaluation entry
+                eval_entry = {
+                    'question_id': question_id,
                     'question_text': question_text,
-                    'ground_truth': question_data['ground_truth'],
+                    'ground_truth': question_data.get('ground_truth', ''),
                     'generated_answer': result['answer'],
-                    'retrieved_chunks': result['retrieved_chunks'],
+                    'retrieved_chunks': result.get('retrieved_chunks', []),
                     'latency_ms': result['latency_ms'],
-                    'variant': variant_name
-                })
+                    'variant': variant_name,
+                    'metadata': question_data.get('metadata', {}),
+                    'source_documents': question_data.get('source_documents', [])
+                }
+                
+                results.append(eval_entry)
                 
             except Exception as e:
                 logger.error(f"Error running {variant_name} on question {question_id}: {e}")
-                continue
+                # Add failed entry
+                results.append({
+                    'question_id': question_id,
+                    'question_text': question_text,
+                    'ground_truth': question_data.get('ground_truth', ''),
+                    'generated_answer': '',
+                    'retrieved_chunks': [],
+                    'latency_ms': 0,
+                    'variant': variant_name,
+                    'error': str(e),
+                    'metadata': question_data.get('metadata', {}),
+                    'source_documents': question_data.get('source_documents', [])
+                })
         
         logger.info(f"{variant_name.upper()}: {len(results)}/{len(questions)} questions completed")
         return results
@@ -259,6 +278,98 @@ class EvaluationOrchestrator:
                 'avg_scores': avg_scores(hybrid_scores)
             }
         }
+    
+    def _load_questions_from_json(
+        self,
+        dataset_name: str,
+        dataset_path: Optional[str] = None,
+        num_questions: Optional[int] = None
+    ) -> List[Dict[str, Any]]:
+        """
+        Load questions from JSON benchmark file.
+        
+        Args:
+            dataset_name: Name of dataset (without .json)
+            dataset_path: Explicit path to JSON file (overrides dataset_name)
+            num_questions: Limit number of questions (None = all)
+        
+        Returns:
+            List of question dictionaries
+        """
+        # Determine file path
+        if dataset_path:
+            file_path = Path(dataset_path)
+        else:
+            datasets_dir = Path(settings.benchmark.datasets_dir)
+            file_path = datasets_dir / f"{dataset_name}.json"
+        
+        # Check if file exists
+        if not file_path.exists():
+            logger.error(f"Benchmark file not found: {file_path}")
+            return []
+        
+        # Load JSON
+        try:
+            with open(file_path, 'r', encoding='utf-8') as f:
+                data = json.load(f)
+            
+            # Extract questions
+            if isinstance(data, dict):
+                questions = data.get('questions', [])
+            elif isinstance(data, list):
+                questions = data
+            else:
+                logger.error(f"Invalid JSON format in {file_path}")
+                return []
+            
+            # Limit number of questions if specified
+            if num_questions and num_questions > 0:
+                questions = questions[:num_questions]
+            
+            logger.info(f"Loaded {len(questions)} questions from {file_path}")
+            return questions
+            
+        except json.JSONDecodeError as e:
+            logger.error(f"Failed to parse JSON from {file_path}: {e}")
+            return []
+        except Exception as e:
+            logger.error(f"Error loading questions from {file_path}: {e}")
+            return []
+    
+    def _save_results(
+        self,
+        results_data: Dict[str, Any],
+        dataset_name: str,
+        output_dir: str
+    ) -> Path:
+        """
+        Save evaluation results to local JSON file.
+        
+        Args:
+            results_data: Complete results data to save
+            dataset_name: Name of benchmark dataset
+            output_dir: Output directory
+        
+        Returns:
+            Path to saved file
+        """
+        output_path = Path(output_dir)
+        output_path.mkdir(parents=True, exist_ok=True)
+        
+        # Create filename with eval_id and dataset name
+        filename = f"eval_{self.eval_id}_{dataset_name}.json"
+        file_path = output_path / filename
+        
+        try:
+            with open(file_path, 'w', encoding='utf-8') as f:
+                json.dump(results_data, f, indent=2, ensure_ascii=False)
+            
+            logger.info(f"Successfully saved results to {file_path}")
+            return file_path
+            
+        except Exception as e:
+            logger.error(f"Failed to save results to {file_path}: {e}")
+            raise
 
 
 # Example usage
@@ -270,7 +381,7 @@ if __name__ == "__main__":
         await orchestrator.initialize()
         
         summary = await orchestrator.run_evaluation(
-            dataset_name="hotpotqa",
+            dataset_name="factual_questions",
             num_questions=10,
             output_dir="./benchmarks/results"
         )

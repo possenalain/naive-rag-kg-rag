@@ -1,0 +1,68 @@
+# ============================================================================
+# DEVELOPMENT DOCKERFILE
+# ============================================================================
+# Purpose: Full development environment with all tools
+# Size: ~800MB (includes dev dependencies and build tools)
+# Use when: Local development, debugging, running tests
+# 
+# Build: docker build -f Dockerfile.dev -t naive-rag:dev .
+# Run:   docker run -it --rm -v ${PWD}:/workspace naive-rag:dev bash
+#
+# Features:
+# - All dev dependencies (pytest, black, mypy, etc.)
+# - Git and build tools included
+# - Volume mounting for live code updates
+# - Interactive development
+# - Not for production use
+#
+# See docs/DOCKER_GUIDE.md for complete documentation
+# ============================================================================
+
+# Development Dockerfile with UV and all dev tools
+FROM python:3.11-slim
+
+# Install system dependencies and UV
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    git \
+    curl \
+    build-essential \
+    libpq-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install UV
+COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
+
+# Create non-root user
+RUN useradd -m -u 1000 devuser && \
+    mkdir -p /workspace /home/devuser/.cache && \
+    chown -R devuser:devuser /workspace /home/devuser
+
+# Set working directory
+WORKDIR /workspace
+
+# Switch to non-root user
+USER devuser
+
+# Copy dependency files
+COPY --chown=devuser:devuser pyproject.toml .
+COPY --chown=devuser:devuser .python-version .
+
+# Create virtual environment
+RUN uv venv
+
+# Add virtual environment to PATH
+ENV PATH="/workspace/.venv/bin:$PATH"
+ENV PYTHONPATH="/workspace:$PYTHONPATH"
+
+# Install dependencies (will be cached if pyproject.toml doesn't change)
+RUN uv sync --all-extras
+
+# Copy application code
+COPY --chown=devuser:devuser . .
+
+# Expose common ports
+EXPOSE 8000 8888
+
+# Default command (can be overridden)
+CMD ["/bin/bash"]

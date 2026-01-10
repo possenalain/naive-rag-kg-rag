@@ -9,9 +9,21 @@ from neo4j import AsyncGraphDatabase, AsyncDriver
 from neo4j.exceptions import ServiceUnavailable
 import logging
 from datetime import datetime
+
+# CRITICAL: Apply Graphiti compatibility patches BEFORE importing Graphiti!
+# This must happen before any Graphiti modules are loaded to ensure the patches
+# are applied to the query functions before they're imported by other modules.
+from src.utils.graphiti_patches import apply_all_patches
+apply_all_patches()
+
+# Now import Graphiti after patches are applied
 from graphiti_core import Graphiti
-from graphiti_core.nodes import EntityNode, EpisodeNode
+from graphiti_core.nodes import EntityNode, EpisodicNode, EpisodeType
 from graphiti_core.edges import EntityEdge
+from graphiti_core.llm_client import LLMConfig
+from graphiti_core.llm_client.gemini_client import GeminiClient
+from graphiti_core.embedder.gemini import GeminiEmbedder, GeminiEmbedderConfig
+from graphiti_core.graphiti import AddEpisodeResults
 
 from config.settings import get_settings
 
@@ -47,14 +59,29 @@ class GraphDatabaseManager:
                 
                 logger.info("Neo4j driver initialized")
                 
-                # Initialize Graphiti
-                self.graphiti = Graphiti(
-                    neo4j_uri=settings.neo4j.uri,
-                    neo4j_user=settings.neo4j.user,
-                    neo4j_password=settings.neo4j.password
+                # Initialize Graphiti with Google Gemini clients
+                llm_config = LLMConfig(
+                    api_key=settings.llm.api_key,
+                    model=settings.llm.model_name,
                 )
-                await self.graphiti.build_indices()
-                logger.info("Graphiti initialized with indices")
+                llm_client = GeminiClient(llm_config)
+                
+                embedder_config = GeminiEmbedderConfig(
+                    api_key=settings.embedding.api_key,
+                    embedding_model=settings.embedding.model_name,
+                    embedding_dim=settings.embedding.dimensions,
+                )
+                embedder_client = GeminiEmbedder(embedder_config)
+                
+                self.graphiti = Graphiti(
+                    uri=settings.neo4j.uri,
+                    user=settings.neo4j.user,
+                    password=settings.neo4j.password,
+                    llm_client=llm_client,
+                    embedder=embedder_client,
+                )
+                await self.graphiti.build_indices_and_constraints()
+                logger.info("Graphiti initialized with Google Gemini LLM and embedder")
                 
             except ServiceUnavailable as e:
                 logger.error(f"Failed to connect to Neo4j: {e}")
@@ -159,24 +186,27 @@ class GraphDatabaseManager:
         self,
         name: str,
         content: str,
-        source: str,
-        source_description: str,
-        metadata: Optional[Dict[str, Any]] = None
-    ) -> EpisodeNode:
+        source_description: str
+    ) -> AddEpisodeResults:
         """
         Add an episode (document chunk) to the knowledge graph using Graphiti.
         Graphiti will extract entities and relationships automatically.
+        
+        Note: Graphiti does not support metadata parameter in add_episode.
+        Use source_description to provide context about the episode.
+        
+        Returns:
+            AddEpisodeResults containing the episode, entities, and relationships
         """
-        episode = await self.graphiti.add_episode(
+        results = await self.graphiti.add_episode(
             name=name,
             episode_body=content,
-            source=source,
+            source=EpisodeType.text,
             source_description=source_description,
-            reference_time=datetime.now(),
-            metadata=metadata or {}
+            reference_time=datetime.now()
         )
         logger.debug(f"Added episode: {name}")
-        return episode
+        return results
     
     async def search_entities(
         self,
@@ -186,7 +216,7 @@ class GraphDatabaseManager:
         """Search for entities semantically using Graphiti."""
         entities = await self.graphiti.search(
             query=query,
-            limit=limit
+            num_results=limit
         )
         logger.debug(f"Found {len(entities)} entities for query: {query}")
         return entities
@@ -348,6 +378,34 @@ class GraphDatabaseManager:
         logger.debug(f"Linked chunk {chunk_id} to {links} entities")
         return links
     
+    async def link_chunk_to_episodic(
+        self,
+        chunk_id: int,
+        episodic_uuid: str
+    ) -> bool:
+        """Link a chunk to its corresponding episodic node."""
+        query = """
+            MATCH (c:Chunk {chunk_id: $chunk_id})
+            MATCH (ep:Episodic {uuid: $episodic_uuid})
+            MERGE (c)-[r:HAS_EPISODE]->(ep)
+            RETURN count(r) as links_created
+        """
+        
+        async with self.driver.session() as session:
+            result = await session.run(
+                query,
+                chunk_id=chunk_id,
+                episodic_uuid=episodic_uuid
+            )
+            record = await result.single()
+        
+        success = record['links_created'] > 0
+        if success:
+            logger.debug(f"Linked chunk {chunk_id} to episodic {episodic_uuid}")
+        else:
+            logger.warning(f"Failed to link chunk {chunk_id} to episodic {episodic_uuid}")
+        return success
+    
     # ===== Knowledge Graph RAG Queries =====
     
     async def kg_retrieve(
@@ -362,21 +420,35 @@ class GraphDatabaseManager:
         2. Traverse to connected chunks
         3. Rank by relevance
         """
-        # Step 1: Search for relevant entities
-        entities = await self.search_entities(query_text, limit=top_k * 2)
+        # Step 1: Search for relevant entities (Graphiti returns edges/relationships)
+        search_results = await self.search_entities(query_text, limit=top_k * 2)
         
-        if not entities:
+        if not search_results:
             logger.warning("No entities found for query")
             return []
         
-        entity_ids = [entity.uuid for entity in entities]
+        # Extract unique entity UUIDs from edges (relationships between entities)
+        entity_ids = set()
+        for result in search_results:
+            # Graphiti search returns EntityEdge objects
+            if hasattr(result, 'source_node_uuid'):
+                entity_ids.add(result.source_node_uuid)
+            if hasattr(result, 'target_node_uuid'):
+                entity_ids.add(result.target_node_uuid)
+            # If it's actually an EntityNode, use its UUID directly
+            elif hasattr(result, 'uuid') and hasattr(result, 'name'):
+                entity_ids.add(result.uuid)
         
-        # Step 2: Get chunks connected to these entities
+        entity_ids = list(entity_ids)
+        logger.info(f"Extracted {len(entity_ids)} unique entity UUIDs from search results")
+        
+        # Step 2: Get chunks connected to these entities via Episodic nodes
+        # Path: Chunk -[:HAS_EPISODE]-> Episodic -[:MENTIONS]-> Entity
         query = """
-            UNWIND $entity_ids as entity_id
-            MATCH (e:Entity)
-            WHERE elementId(e) = entity_id
-            MATCH (e)<-[:HAS_ENTITY]-(c:Chunk)
+            UNWIND $entity_ids as entity_uuid
+            MATCH (e:Entity {uuid: entity_uuid})
+            MATCH (e)<-[:MENTIONS]-(ep:Episodic)
+            MATCH (c:Chunk)-[:HAS_EPISODE]->(ep)
             WITH DISTINCT c, COUNT(DISTINCT e) as entity_count
             ORDER BY entity_count DESC
             LIMIT $top_k
@@ -390,7 +462,7 @@ class GraphDatabaseManager:
         async with self.driver.session() as session:
             result = await session.run(
                 query,
-                entity_ids=entity_ids,
+                entity_ids=entity_ids,  # Now these are UUIDs
                 top_k=top_k
             )
             records = await result.data()
@@ -493,3 +565,27 @@ async def get_graph() -> GraphDatabaseManager:
     if not graph_manager.driver:
         await graph_manager.initialize()
     return graph_manager
+
+
+if __name__ == "__main__":
+    import sys
+    
+    async def init_graph():
+        """Initialize graph database with indices and constraints."""
+        try:
+            await graph_manager.initialize()
+            logger.info("Graph database initialized successfully")
+            await graph_manager.close()
+            return True
+        except Exception as e:
+            logger.error(f"Failed to initialize graph database: {e}")
+            await graph_manager.close()
+            return False
+    
+    if len(sys.argv) > 1 and sys.argv[1] == "init":
+        logging.basicConfig(level=logging.INFO)
+        success = asyncio.run(init_graph())
+        sys.exit(0 if success else 1)
+    else:
+        print("Usage: python -m src.utils.graph init")
+        sys.exit(1)

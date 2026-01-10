@@ -108,7 +108,7 @@ class IngestionPipeline:
         # Step 2: Chunk documents
         logger.info("Step 2/5: Chunking documents...")
         doc_chunks = self.chunker.chunk_documents(documents)
-        all_chunks = [chunk for chunks in doc_chunks.values() for chunk in chunks]
+        all_chunks = [chunk for _, chunks in doc_chunks for chunk in chunks]
         chunk_stats = self.chunker.get_chunk_stats(all_chunks)
         logger.info(f"Created {chunk_stats['total_chunks']} chunks, "
                    f"avg {chunk_stats['avg_tokens']} tokens/chunk")
@@ -168,7 +168,7 @@ class IngestionPipeline:
         embeddings = await self.embedder.embed_batch([c.text for c in chunks])
         
         # Store
-        stored_chunks = await self._store_in_postgres([document], {document: chunks}, embeddings)
+        stored_chunks = await self._store_in_postgres([document], [(document, chunks)], embeddings)
         
         # Build KG
         kg_stats = {}
@@ -185,14 +185,15 @@ class IngestionPipeline:
     async def _store_in_postgres(
         self,
         documents: List[Document],
-        doc_chunks: Dict[Document, List[Chunk]],
+        doc_chunks: List[tuple],  # List of (document, chunks) tuples
         embeddings: List[List[float]]
     ) -> List[Dict[str, Any]]:
         """Store documents and chunks in PostgreSQL."""
         stored_chunks = []
         embedding_idx = 0
         
-        for document in documents:
+        # Iterate through doc_chunks tuples
+        for document, chunks in doc_chunks:
             try:
                 # Insert document
                 doc_id = await self.db.insert_document(
@@ -203,7 +204,6 @@ class IngestionPipeline:
                 )
                 
                 # Insert chunks for this document
-                chunks = doc_chunks[document]
                 for chunk in chunks:
                     embedding = embeddings[embedding_idx]
                     embedding_idx += 1
@@ -249,8 +249,7 @@ class IngestionPipeline:
                     'chunk_id': c['chunk_id'],
                     'chunk_text': c['chunk_text'],
                     'document_id': c['document_id'],
-                    'chunk_index': c['chunk_index'],
-                    'metadata': {}
+                    'chunk_index': c['chunk_index']
                 }
                 for c in stored_chunks
             ]
@@ -278,23 +277,30 @@ class IngestionPipeline:
                     continue
                 
                 # Add episodes to Graphiti (max 10 per doc to avoid overwhelming)
-                for chunk in chunks[:10]:
-                    try:
-                        episode = await self.graph.add_episode(
-                            name=f"{doc.title} - Chunk {chunk['chunk_index']}",
-                            content=chunk['chunk_text'],
-                            source=doc.source_path,
-                            source_description=f"Chunk from document: {doc.title}",
-                            metadata={'chunk_id': chunk['chunk_id'], 'document_id': doc_id}
-                        )
-                        entities_created += 1
-                        
-                        # Link chunk to entities (simplified - Graphiti handles internally)
-                        logger.debug(f"Added episode for chunk {chunk['chunk_id']}")
-                        
-                    except Exception as e:
-                        logger.warning(f"Error adding episode for chunk {chunk['chunk_id']}: {e}")
-                        continue
+                for i, chunk in enumerate(chunks[:10]):
+
+                        try:
+                            results = await self.graph.add_episode(
+                                name=f"{doc.title} - Chunk {chunk['chunk_index']}",
+                                content=chunk['chunk_text'],
+                                source_description=f"Chunk {chunk['chunk_index']} from document '{doc.title}' (source: {doc.source_path}, chunk_id: {chunk['chunk_id']}, document_id: {doc_id})"
+                            )
+                            entities_created += 1
+                            
+                            # Link Chunk node to Episodic node so we can traverse Chunk->Episodic->Entity
+                            # AddEpisodeResults has an 'episode' field which is the EpisodicNode
+                            await self.graph.link_chunk_to_episodic(chunk['chunk_id'], results.episode.uuid)
+                            
+                            logger.debug(f"Added episode for chunk {chunk['chunk_id']}")
+                        except Exception as e:
+                            error_msg = str(e).lower()
+                            if "rate limit" in error_msg:
+                                logger.warning(f"Rate limit hit when adding episode for chunk {chunk['chunk_id']}")
+                                logger.error(f"{e}")
+                                break
+                            else:
+                                logger.warning(f"Error adding episode for chunk {chunk['chunk_id']}: {e}")
+                                continue 
             
             logger.info(f"Entity extraction complete: {entities_created} episodes added")
             

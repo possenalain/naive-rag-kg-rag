@@ -2,6 +2,14 @@
 
 A comprehensive benchmarking system to compare and evaluate three Retrieval-Augmented Generation (RAG) approaches for multi-hop question answering.
 
+> 🚀 **Now using [UV](https://github.com/astral-sh/uv)** - A blazingly fast Python package manager (10-100x faster than pip)!
+>
+> 📚 **Setup Guides**:
+> - [QUICKSTART.md](docs/QUICKSTART.md) - Quick start in 10 minutes ⚡
+> - [SETUP_GUIDE.md](docs/SETUP_GUIDE.md) - Complete setup instructions
+> - [UV_MIGRATION.md](docs/UV_MIGRATION.md) - UV usage and benefits
+> - [DOCKER_GUIDE.md](docs/DOCKER_GUIDE.md) - Docker usage guide
+
 ## 🎯 Project Goals
 
 Quantitatively compare three RAG architectures:
@@ -20,6 +28,15 @@ Evaluate performance on multi-hop reasoning tasks using standard benchmarks (Hot
 
 ```
 naive-rag-kg-rag/
+├── docs/                            # 📚 All documentation
+│   ├── README.md                    # Documentation index
+│   ├── QUICKSTART.md                # Quick start guide
+│   ├── SETUP_GUIDE.md               # Complete setup instructions
+│   ├── UV_MIGRATION.md              # UV usage guide
+│   ├── DOCKER_GUIDE.md              # Docker guide
+│   ├── ARCHITECTURE.md              # System architecture
+│   ├── IMPLEMENTATION_PLAN.md       # Implementation roadmap
+│   └── TASKS.md                     # Task tracking
 ├── config/                          # Configuration management
 │   ├── __init__.py
 │   ├── settings.py                  # Pydantic settings
@@ -101,12 +118,36 @@ naive-rag-kg-rag/
 ### Prerequisites
 
 - Python 3.11+
+- [UV](https://github.com/astral-sh/uv) (fast Python package installer) - **Recommended**
 - Docker & Docker Compose
 - 8GB+ RAM
 - (Optional) NVIDIA GPU for local LLMs
 
 ### 1. Clone and Setup
 
+**With UV (Recommended - 10x faster)**:
+```bash
+# Install UV if not already installed
+# Windows PowerShell:
+powershell -c "irm https://astral.sh/uv/install.ps1 | iex"
+# Linux/macOS:
+curl -LsSf https://astral.sh/uv/install.sh | sh
+
+# Navigate to project directory
+cd naive-rag-kg-rag
+
+# Create virtual environment and install dependencies
+uv venv
+uv sync --all-extras
+
+# Activate virtual environment
+# Windows PowerShell:
+.venv\Scripts\Activate.ps1
+# Linux/Mac:
+source .venv/bin/activate
+```
+
+**Traditional pip method** (if UV not available):
 ```bash
 # Navigate to project directory
 cd naive-rag-kg-rag
@@ -123,6 +164,8 @@ source venv/bin/activate
 # Install dependencies
 pip install -r requirements.txt
 ```
+
+> 💡 **Tip**: See [UV_MIGRATION.md](docs/UV_MIGRATION.md) for detailed UV usage and migration guide.
 
 ### 2. Configure Environment
 
@@ -144,30 +187,40 @@ docker-compose up -d
 docker-compose ps
 
 # Initialize databases
-python -m src.utils.db init
-python -m src.utils.graph init
+uv run python -m src.utils.db init
+uv run python -m src.utils.graph init
 ```
 
 ### 4. Ingest Documents
 
 ```bash
-# Ingest sample documents
-python -m src.ingestion.pipeline \
+# With UV (recommended):
+uv run python -m src.ingestion.pipeline \
     --input-dir ./data/documents \
     --embedding-provider gemini \
     --build-graph
 
 # Check ingestion status
-python -m src.ingestion.pipeline --status
-```
+uv run python -m src.ingestion.pipeline --status
 
-### 5. Run Evaluation
-
-```bash
+# Or with activated venv:
+python -m src.ingestion.pipeline \
+    --input-dir ./data/documents \
+    --embedding-provider gemini \
+  With UV (recommended):
 # Run benchmark evaluation
-python -m src.evaluation.orchestrator \
+uv run python -m src.evaluation.orchestrator \
     --dataset hotpotqa \
     --num-questions 50 \
+    --output ./benchmarks/results
+
+# Score results with LLM
+uv run python -m src.evaluation.scorer \
+    --answers ./benchmarks/results/answers.json \
+    --output ./benchmarks/results/scores.json
+
+# Or with activated venv:
+python -m src.evaluation.orchestrator --dataset hotpotqa --num-questions 50
     --output ./benchmarks/results
 
 # Score results with LLM
@@ -175,19 +228,27 @@ python -m src.evaluation.scorer \
     --answers ./benchmarks/results/answers.json \
     --output ./benchmarks/results/scores.json
 ```
-
-### 6. Analyze Results
-
-```bash
+With UV (recommended):
 # Generate statistical analysis
-python -m src.analysis.statistics \
+uv run python -m src.analysis.statistics \
     --scores ./benchmarks/results/scores.json \
     --output ./benchmarks/results/analysis_report.md
 
 # Generate visualizations
-python -m src.analysis.visualizations \
+uv run python -m src.analysis.visualizations \
     --scores ./benchmarks/results/scores.json \
     --output-dir ./benchmarks/results/figures
+
+# Or with activated venv:
+python -m src.analysis.statistics --scores ./benchmarks/results/scores.json
+```
+
+Or use Jupyter notebooks:
+```bash
+# With UV:
+uv run jupyter lab notebooks/
+
+# Or with activated venv:utput-dir ./benchmarks/results/figures
 ```
 
 Or use Jupyter notebooks:
@@ -195,7 +256,70 @@ Or use Jupyter notebooks:
 jupyter lab notebooks/
 ```
 
-## 🔧 Configuration
+## � Docker Usage
+
+This project provides two Dockerfiles for different use cases:
+
+- **`Dockerfile`** - Optimized production image (~500MB)
+- **`Dockerfile.dev`** - Full development environment (~800MB)
+
+**Quick Start**:
+```bash
+# Build production image
+docker build -t naive-rag:latest .
+
+# Build development image
+docker build -f Dockerfile.dev -t naive-rag:dev .
+
+# Run with docker-compose (databases only)
+docker-compose up -d
+```
+
+**Recommended Workflow**: Use UV locally for development (fastest), Docker for deployment.
+
+See [DOCKER_GUIDE.md](docs/DOCKER_GUIDE.md) for complete Docker documentation.
+
+## �🔧 Configuration
+
+### Helper Scripts
+
+For convenience, use the provided helper scripts:
+
+**Windows (PowerShell)**:
+```powershell
+# Show all available commands
+.\make.ps1 help
+
+# Complete setup
+.\make.ps1 setup
+
+# Run tests
+.\make.ps1 test
+
+# Format code
+.\make.ps1 format
+
+# Start Docker services
+.\make.ps1 docker-up
+```
+
+**Linux/macOS (Makefile)**:
+```bash
+# Show all available commands
+make help
+
+# Complete setup
+make setup
+
+# Run tests
+make test
+
+# Format code
+make format
+
+# Start Docker services
+make docker-up
+```
 
 ### Environment Variables
 

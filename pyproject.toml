@@ -1,0 +1,190 @@
+[project]
+name = "naive-rag-kg-rag"
+version = "0.1.0"
+description = "A comprehensive benchmarking system to compare Naive RAG vs Knowledge Graph RAG"
+readme = "README.md"
+requires-python = ">=3.11"
+authors = [
+    { name = "Alain", email = "possenalain21@gmail.com" }
+]
+license = { text = "MIT" }
+
+dependencies = [
+    # Core Dependencies
+    "python-dotenv>=1.0",
+    "pydantic>=2.0",
+    "pydantic-settings>=2.0",
+    "pydantic-ai>=0.3",
+    
+    # Database
+    "asyncpg>=0.29",
+    "psycopg2-binary>=2.9",
+    "neo4j>=5.0",
+    "graphiti-core[google-genai]>=0.12",
+    
+    # LLM & Embeddings
+    "openai>=1.0",
+    "google-genai>=1.0",
+    "anthropic>=0.54",
+    "tiktoken>=0.7",
+    
+    # FastAPI (if building API)
+    "fastapi>=0.100",
+    "uvicorn[standard]>=0.30",
+    "python-multipart>=0.0.9",
+    "sse-starlette>=2.0",
+    
+    # Data Processing
+    "pandas>=2.0",
+    "numpy>=1.24",
+    "scipy>=1.11",
+    
+    # NLP & Text Processing
+    "nltk>=3.8",
+    "spacy>=3.7",
+    "sentence-transformers>=3.0",
+    
+    # Visualization
+    "matplotlib>=3.8",
+    "seaborn>=0.13",
+    "plotly>=5.0",
+    
+    # Logging & Monitoring
+    "loguru>=0.7",
+    "python-json-logger>=2.0",
+    
+    # Async & Concurrency
+    "aiohttp>=3.9",
+    "httpx>=0.27",
+    "tenacity>=8.0",
+    
+    # CLI & Progress
+    "click>=8.0",
+    "rich>=13.0",
+    "tqdm>=4.65",
+    
+    # Jupyter Support
+    "jupyter>=1.0",
+    "jupyterlab>=4.0",
+    "ipykernel>=6.29",
+    "ipywidgets>=8.0",
+    "notebook>=7.0",
+    "nest-asyncio>=1.6",
+    
+    # Utils
+    "python-dateutil>=2.8",
+    "pytz>=2024.1",
+    "pyyaml>=6.0",
+    "toml>=0.10",
+    
+    # Development Tools
+    "ipython>=8.0",
+    "ipdb>=0.13",
+]
+
+[project.optional-dependencies]
+dev = [
+    # Testing
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5.0",
+    "pytest-mock>=3.12",
+    "pytest-timeout>=2.3",
+    "faker>=20.0",
+    
+    # Code Quality
+    "black>=24.0",
+    "isort>=5.13",
+    "flake8>=7.0",
+    "mypy>=1.8",
+    "pylint>=3.0",
+]
+
+docs = [
+    # Documentation
+    "mkdocs>=1.5",
+    "mkdocs-material>=9.5",
+]
+
+[project.scripts]
+rag-cli = "cli:cli"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src"]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "pytest-asyncio>=0.23",
+    "pytest-cov>=5.0",
+    "pytest-mock>=3.12",
+    "pytest-timeout>=2.3",
+    "faker>=20.0",
+    "black>=24.0",
+    "isort>=5.13",
+    "flake8>=7.0",
+    "mypy>=1.8",
+    "pylint>=3.0",
+]
+
+[tool.black]
+line-length = 100
+target-version = ['py311']
+include = '\.pyi?$'
+extend-exclude = '''
+/(
+  # directories
+  \.eggs
+  | \.git
+  | \.hg
+  | \.mypy_cache
+  | \.tox
+  | \.venv
+  | build
+  | dist
+)/
+'''
+
+[tool.isort]
+profile = "black"
+line_length = 100
+multi_line_output = 3
+include_trailing_comma = true
+force_grid_wrap = 0
+use_parentheses = true
+ensure_newline_before_comments = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "--verbose",
+    "--cov=src",
+    "--cov-report=html",
+    "--cov-report=term-missing",
+    "--asyncio-mode=auto",
+]
+asyncio_mode = "auto"
+
+[tool.mypy]
+python_version = "3.11"
+warn_return_any = true
+warn_unused_configs = true
+disallow_untyped_defs = true
+ignore_missing_imports = true
+
+[tool.pylint.messages_control]
+disable = [
+    "C0111",  # missing-docstring
+    "C0103",  # invalid-name
+    "R0903",  # too-few-public-methods
+]
+
+[tool.pylint.format]
+max-line-length = 100

@@ -1,0 +1,502 @@
+{
+  "dataset_name": "big_tech_multihop_part1",
+  "description": "Multi-hop questions requiring synthesis across documents",
+  "question_type": "multihop",
+  "questions": [
+    {
+      "question_id": "multi_001",
+      "question_text": "Which companies invested in both OpenAI and Anthropic, and what was the total amount invested in each?",
+      "ground_truth": "No company invested in both OpenAI and Anthropic. Microsoft invested $13 billion total in OpenAI. Amazon invested $8 billion total in Anthropic. Google invested $3 billion in Anthropic but not in OpenAI.",
+      "source_documents": ["doc1_openai_funding.md", "doc2_anthropic_amazon.md", "doc6_google_ai_strategy.md"],
+      "difficulty": "medium",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "cross-company-comparisons", "entities": ["OpenAI", "Anthropic", "Microsoft", "Amazon", "Google"]}
+    },
+    {
+      "question_id": "multi_002",
+      "question_text": "Compare the valuations of OpenAI, Anthropic, and Databricks after their latest funding rounds. Which company achieved the highest valuation and by how much?",
+      "ground_truth": "OpenAI achieved the highest valuation at $157 billion after raising $6.6 billion. Databricks was valued at $62 billion after raising $10 billion. Anthropic was valued at $40+ billion after Amazon's $4 billion investment. OpenAI's valuation exceeded Databricks by $95 billion and Anthropic by approximately $117 billion.",
+      "source_documents": ["doc1_openai_funding.md", "doc2_anthropic_amazon.md", "doc4_databricks_funding.md"],
+      "difficulty": "medium",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "cross-company-comparisons", "entities": ["OpenAI", "Anthropic", "Databricks"]}
+    },
+    {
+      "question_id": "multi_003",
+      "question_text": "How does Microsoft's relationship with OpenAI differ from Amazon's relationship with Anthropic in terms of infrastructure and competition?",
+      "ground_truth": "Microsoft invested $13 billion in OpenAI but now lists OpenAI as a competitor in search and AI services. Amazon invested $8 billion in Anthropic and designated AWS as Anthropic's primary cloud provider. Unlike Microsoft's competitive tension with OpenAI, Amazon's relationship appears more cooperative, with Anthropic migrating from Google Cloud to AWS and using Amazon's Trainium chips.",
+      "source_documents": ["doc5_microsoft_openai_tensions.md", "doc2_anthropic_amazon.md", "doc1_openai_funding.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "cross-company-comparisons", "entities": ["Microsoft", "OpenAI", "Amazon", "Anthropic"]}
+    },
+    {
+      "question_id": "multi_004",
+      "question_text": "What is the total investment made by Thrive Capital across OpenAI and Databricks, and what does this reveal about their investment strategy?",
+      "ground_truth": "Thrive Capital led OpenAI's $6.6 billion round with a $1.2 billion commitment and led Databricks' $10 billion Series J. This reveals Thrive Capital's focus on investing in large-scale AI infrastructure and platform companies, backing both foundation model providers and data/AI platforms.",
+      "source_documents": ["doc1_openai_funding.md", "doc4_databricks_funding.md"],
+      "difficulty": "medium",
+      "reasoning_hops": 2,
+      "metadata": {"topic": "investment-patterns", "entities": ["Thrive Capital", "OpenAI", "Databricks"]}
+    },
+    {
+      "question_id": "multi_005",
+      "question_text": "Compare Google's investment strategy across Anthropic and Scale AI. What happened to their relationship with Scale AI after Meta's acquisition?",
+      "ground_truth": "Google invested $3 billion in Anthropic as part of a multi-partner approach. After Meta acquired a 49% stake in Scale AI for $14.8 billion, Google terminated its $200 million annual contract with Scale AI, citing competitive conflicts since Scale AI's CEO joined Meta.",
+      "source_documents": ["doc6_google_ai_strategy.md", "doc3_meta_scale_acquisition.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "investment-patterns", "entities": ["Google", "Anthropic", "Scale AI", "Meta"]}
+    },
+    {
+      "question_id": "multi_006",
+      "question_text": "Which AI companies raised mega-rounds ($1B+) in 2024, and what was the combined total funding?",
+      "ground_truth": "In 2024, mega-rounds included: OpenAI ($6.6B), xAI ($6.0B), Anthropic ($4.0B from Amazon), Databricks ($10B), CoreWeave ($1.1B), Scale AI ($1.0B), Perplexity ($1.0B), Character.AI ($2.7B), and Harvey ($1.5B). The combined total was approximately $33.9 billion across these companies.",
+      "source_documents": ["doc11_investment_funding_trends.md", "doc1_openai_funding.md", "doc2_anthropic_amazon.md", "doc4_databricks_funding.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 4,
+      "metadata": {"topic": "investment-patterns", "entities": ["OpenAI", "xAI", "Anthropic", "Databricks", "CoreWeave", "Perplexity", "Harvey"]}
+    },
+    {
+      "question_id": "multi_007",
+      "question_text": "How did Sam Altman's leadership crisis at OpenAI in November 2023 compare to other executive moves in the AI industry, and what does this reveal about leadership stability?",
+      "ground_truth": "Sam Altman was fired and reinstated within 5 days after 770+ employees threatened resignation and Microsoft offered to hire the entire team. This contrasts with smooth executive transitions like Mustafa Suleyman joining Microsoft for $650 million or Alexandr Wang joining Meta for $14.8 billion. Altman's crisis revealed unprecedented employee loyalty but also governance challenges, while other moves were strategic acquisitions.",
+      "source_documents": ["doc7_sam_altman_profile.md", "doc12_executive_moves.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "executive-movements", "entities": ["Sam Altman", "OpenAI", "Mustafa Suleyman", "Microsoft", "Alexandr Wang", "Meta"]}
+    },
+    {
+      "question_id": "multi_008",
+      "question_text": "Which executives moved from AI startups to Big Tech companies, and what was the total acquisition value associated with these moves?",
+      "ground_truth": "Mustafa Suleyman (Inflection AI to Microsoft) for $650 million, Alexandr Wang (Scale AI to Meta) as part of $14.8 billion investment, and Character.AI founders (Noam Shazeer and Daniel De Freitas to Google) for $2.7 billion. Total acquisition value: approximately $18.15 billion.",
+      "source_documents": ["doc12_executive_moves.md", "doc3_meta_scale_acquisition.md"],
+      "difficulty": "medium",
+      "reasoning_hops": 2,
+      "metadata": {"topic": "executive-movements", "entities": ["Mustafa Suleyman", "Alexandr Wang", "Noam Shazeer", "Microsoft", "Meta", "Google"]}
+    },
+    {
+      "question_id": "multi_009",
+      "question_text": "What leadership changes did Apple make to address its AI struggles, and how do these compare to Meta's AI talent strategy?",
+      "ground_truth": "Apple appointed Mike Rockwell to lead Siri development, named Kim Vorrath as deputy to AI chief, and acquired 32 AI companies. Meta invested $14.8 billion in Scale AI and hired CEO Alexandr Wang, expanded Yann LeCun's research team by 40%, and reportedly offers $100 million bonuses to poach OpenAI talent. Meta's approach is more aggressive and expensive compared to Apple's restructuring focus.",
+      "source_documents": ["doc10_apple_ai_struggles.md", "doc3_meta_scale_acquisition.md", "doc12_executive_moves.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "executive-movements", "entities": ["Apple", "Meta", "Mike Rockwell", "Alexandr Wang", "Yann LeCun"]}
+    },
+    {
+      "question_id": "multi_010",
+      "question_text": "Compare the market share of ChatGPT, Google Gemini, and Claude across consumer and enterprise segments. Which company has the greatest disparity between consumer and enterprise adoption?",
+      "ground_truth": "Consumer market: ChatGPT 60.2%, Gemini 13.5%, Claude 4.2%. Enterprise API usage: OpenAI 45%, Anthropic Claude 18%, Google Vertex AI 15%. OpenAI shows the greatest disparity with 60.2% consumer share but only 45% enterprise API usage (15.2 point gap), while Anthropic has 4.2% consumer but 18% enterprise (13.8 point gap favoring enterprise).",
+      "source_documents": ["doc6_google_ai_strategy.md", "doc15_competitive_analysis.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "competitive-dynamics", "entities": ["OpenAI", "Google", "Anthropic", "ChatGPT", "Gemini", "Claude"]}
+    },
+    {
+      "question_id": "multi_011",
+      "question_text": "How does Microsoft's competitive position differ between consumer AI assistants and enterprise AI platforms, and what drives this difference?",
+      "ground_truth": "Microsoft has 8.7% market share in consumer AI assistants (Copilot) but 39% market share in enterprise AI platforms. The difference is driven by Microsoft's existing enterprise relationships through Office 365, integration with productivity tools, and Azure cloud platform. Consumer market is dominated by ChatGPT at 60.2%.",
+      "source_documents": ["doc15_competitive_analysis.md", "doc17_cloud_wars.md"],
+      "difficulty": "medium",
+      "reasoning_hops": 2,
+      "metadata": {"topic": "competitive-dynamics", "entities": ["Microsoft", "Copilot", "Azure"]}
+    },
+    {
+      "question_id": "multi_012",
+      "question_text": "What is NVIDIA's market share in AI accelerators, and how does this compare to the combined market share of all competitors? What are the implications for AI infrastructure costs?",
+      "ground_truth": "NVIDIA commands 80-95% market share in AI accelerators, while all competitors combined (AMD 3-5%, Intel 2-3%, Google TPUs 1-2%, others 2-5%) hold only 5-20%. This dominance enables NVIDIA to maintain 73% gross margins and charge $25,000-$40,000 per H100 chip, significantly impacting AI infrastructure costs for companies. Major customers like Microsoft spent $31 billion on NVIDIA chips in 2024.",
+      "source_documents": ["doc8_nvidia_dominance.md", "doc17_cloud_wars.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "competitive-dynamics", "entities": ["NVIDIA", "AMD", "Intel", "Google", "Microsoft"]}
+    },
+    {
+      "question_id": "multi_013",
+      "question_text": "How do the three major cloud providers (AWS, Azure, Google Cloud) differ in their AI partnership strategies, and what market share does each hold?",
+      "ground_truth": "AWS holds 31% market share with a multi-provider approach (Anthropic $8B, multiple models via Bedrock). Azure holds 25% with exclusive OpenAI partnership ($13B investment). Google Cloud holds 11% with internal Gemini models plus $3B Anthropic investment. AWS pursues model diversity, Azure prioritizes OpenAI integration, and Google leverages internal research.",
+      "source_documents": ["doc17_cloud_wars.md", "doc2_anthropic_amazon.md", "doc5_microsoft_openai_tensions.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "competitive-dynamics", "entities": ["AWS", "Azure", "Google Cloud", "Amazon", "Microsoft", "Google"]}
+    },
+    {
+      "question_id": "multi_014",
+      "question_text": "Compare the competitive strategies of OpenAI, Anthropic, and Meta in terms of their approach to open source and partnerships. How do these strategies affect their market positioning?",
+      "ground_truth": "OpenAI maintains closed models with exclusive Microsoft partnership, achieving 60.2% consumer market share. Anthropic partners with both Amazon ($8B) and Google ($3B) while focusing on safety, capturing 4.2% consumer and 18% enterprise share. Meta releases open-source LLaMA models (1 billion downloads) to commoditize AI, holding 6.1% consumer share. OpenAI's closed approach leads in consumer adoption, Anthropic's multi-partner strategy succeeds in enterprise, and Meta's open source aims to prevent competitor moats.",
+      "source_documents": ["doc15_competitive_analysis.md", "doc6_google_ai_strategy.md", "doc2_anthropic_amazon.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 4,
+      "metadata": {"topic": "competitive-dynamics", "entities": ["OpenAI", "Anthropic", "Meta", "Microsoft", "Amazon", "Google"]}
+    },
+    {
+      "question_id": "multi_015",
+      "question_text": "What is Apple's position in the AI assistant market compared to competitors, and how do its AI challenges explain this position?",
+      "ground_truth": "Apple's Siri holds only 15.1% of the AI assistant market, declining from previous leadership, while Google Assistant leads at 31.2%, Amazon Alexa at 28.7%, and ChatGPT at 18.4%. Apple's position reflects its AI struggles: disabled features due to quality issues, Siri redesign requiring complete V2 architecture rebuild pushed to 2026, and on-device processing limitations that create competitive disadvantages versus cloud-based rivals.",
+      "source_documents": ["doc10_apple_ai_struggles.md", "doc15_competitive_analysis.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "competitive-dynamics", "entities": ["Apple", "Siri", "Google", "Amazon", "OpenAI"]}
+    },
+    {
+      "question_id": "multi_016",
+      "question_text": "What are the three major AI platform alliances, and how does each alliance's combined investment compare?",
+      "ground_truth": "The three major alliances are: (1) Microsoft + OpenAI with $13 billion investment focused on enterprise and Office 365 integration, (2) Amazon + Anthropic with $8 billion investment focused on cloud infrastructure and AWS Bedrock, and (3) Google with internal Gemini development plus $3 billion in Anthropic. Microsoft's alliance has the highest single-partner investment at $13 billion.",
+      "source_documents": ["doc5_microsoft_openai_tensions.md", "doc2_anthropic_amazon.md", "doc6_google_ai_strategy.md"],
+      "difficulty": "medium",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "competitive-dynamics", "entities": ["Microsoft", "OpenAI", "Amazon", "Anthropic", "Google"]}
+    },
+    {
+      "question_id": "multi_017",
+      "question_text": "How does the total AI investment by Big Tech companies compare to the total venture capital funding for AI startups in 2024?",
+      "ground_truth": "Big Tech combined AI spending in 2024-2025 was $320 billion (Microsoft $65B, Google $52B, Amazon $48B, Meta $39B, Apple $31B, plus others). Total AI venture capital funding in 2024 was $104.2 billion. Big Tech spending exceeded VC funding by more than 3x, demonstrating the massive scale of corporate AI investment.",
+      "source_documents": ["doc11_investment_funding_trends.md", "doc9_ai_market_analysis.md", "doc20_international_competition.md"],
+      "difficulty": "medium",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "investment-patterns", "entities": ["Microsoft", "Google", "Amazon", "Meta", "Apple"]}
+    },
+    {
+      "question_id": "multi_018",
+      "question_text": "What is the total investment made in AI infrastructure companies (including CoreWeave, Groq, Cerebras, and Lambda Labs), and how does this compare to foundation model funding?",
+      "ground_truth": "AI infrastructure companies raised: CoreWeave $1.1B, Groq $640M, Cerebras $250M, Lambda Labs $320M, totaling approximately $2.31 billion. Foundation models and APIs received $34.2 billion in funding. Foundation model funding exceeded infrastructure funding by approximately 15x, showing greater investor focus on model development than compute infrastructure.",
+      "source_documents": ["doc11_investment_funding_trends.md", "doc16_startup_ecosystem.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "investment-patterns", "entities": ["CoreWeave", "Groq", "Cerebras", "Lambda Labs"]}
+    },
+    {
+      "question_id": "multi_019",
+      "question_text": "Compare the investment received by vertical AI solutions (Harvey for legal, Tempus for healthcare, Glean for enterprise search) and analyze which sector receives the most AI startup funding.",
+      "ground_truth": "Harvey (legal AI) received $1.5 billion at $8B valuation, Tempus (healthcare AI) received $410 million, and Glean (enterprise search) received $260 million at $4.6B valuation. Legal AI received the highest single investment at $1.5 billion. According to funding trends, enterprise AI applications received $22.1 billion total, more than vertical solutions' $15.7 billion.",
+      "source_documents": ["doc11_investment_funding_trends.md", "doc16_startup_ecosystem.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "investment-patterns", "entities": ["Harvey", "Tempus", "Glean"]}
+    },
+    {
+      "question_id": "multi_020",
+      "question_text": "What is the geographic distribution of AI venture capital funding across North America, Asia-Pacific, and Europe, and what total funding did these regions receive?",
+      "ground_truth": "North America received $67.7 billion (65% of global AI funding), Asia-Pacific received $22.9 billion (22%), and Europe received $13.6 billion (13%). Combined total: $104.2 billion in global AI funding for 2024. North America's funding exceeded Asia-Pacific and Europe combined.",
+      "source_documents": ["doc11_investment_funding_trends.md", "doc9_ai_market_analysis.md"],
+      "difficulty": "medium",
+      "reasoning_hops": 2,
+      "metadata": {"topic": "investment-patterns", "entities": ["North America", "Asia-Pacific", "Europe"]}
+    },
+    {
+      "question_id": "multi_021",
+      "question_text": "Comparing NVIDIA's customer purchases, what is the combined total spending by Microsoft, Meta, Google, and Amazon on NVIDIA chips in 2024?",
+      "ground_truth": "In 2024, Microsoft purchased 485,000 Hopper chips for $31 billion, Meta bought 224,000 chips for $18 billion, Google bought 169,000 chips for $13 billion, and Amazon bought 125,000 chips for $9 billion. Combined total spending: $71 billion, representing significant portion of NVIDIA's $126.5 billion total 2024 revenue.",
+      "source_documents": ["doc8_nvidia_dominance.md"],
+      "difficulty": "medium",
+      "reasoning_hops": 2,
+      "metadata": {"topic": "investment-patterns", "entities": ["NVIDIA", "Microsoft", "Meta", "Google", "Amazon"]}
+    },
+    {
+      "question_id": "multi_022",
+      "question_text": "How does the AI market size in 2024 compare to projected 2034 size, and what is the compound annual growth rate? How does this compare to the current annual AI funding?",
+      "ground_truth": "The global AI market was $638.23 billion in 2024 and is projected to reach $3.68 trillion by 2034, representing a 19.2% CAGR. This means the market will grow approximately 5.8x over 10 years. The $104.2 billion in 2024 AI venture funding represents about 16% of the current total market size.",
+      "source_documents": ["doc9_ai_market_analysis.md", "doc11_investment_funding_trends.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "market-trends", "entities": ["AI market"]}
+    },
+    {
+      "question_id": "multi_023",
+      "question_text": "Compare the revenue and growth metrics of OpenAI and Databricks. Which company has higher revenue, and which has higher valuation per dollar of revenue?",
+      "ground_truth": "OpenAI reports $3.6 billion ARR with $157 billion valuation (43.6x revenue multiple), while Databricks has $3 billion ARR with $62 billion valuation (20.7x revenue multiple). OpenAI has slightly higher revenue ($3.6B vs $3B) but significantly higher valuation multiple (43.6x vs 20.7x), reflecting premium valuation for foundation model providers versus data platforms.",
+      "source_documents": ["doc1_openai_funding.md", "doc4_databricks_funding.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "market-trends", "entities": ["OpenAI", "Databricks"]}
+    },
+    {
+      "question_id": "multi_024",
+      "question_text": "How do regional AI market shares (North America, Asia-Pacific, Europe) compare to regional AI funding distribution, and what does this reveal about investment efficiency?",
+      "ground_truth": "Market share: North America 36.92% ($235.7B), Asia-Pacific has highest growth at 19.8% CAGR ($192.3B), Europe 15.2% ($97B). Funding distribution: North America 65%, Asia-Pacific 22%, Europe 13%. North America receives 65% of funding but holds 37% of market, suggesting over-investment. Asia-Pacific receives 22% of funding while representing significant market share with highest growth, indicating under-funding relative to opportunity.",
+      "source_documents": ["doc9_ai_market_analysis.md", "doc11_investment_funding_trends.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 4,
+      "metadata": {"topic": "market-trends", "entities": ["North America", "Asia-Pacific", "Europe"]}
+    },
+    {
+      "question_id": "multi_025",
+      "question_text": "What is the combined market capitalization and revenue of NVIDIA at its peak, and how does this compare to the total AI infrastructure market?",
+      "ground_truth": "NVIDIA reached peak market capitalization of $2.7 trillion with $126.5 billion revenue in 2024 (108% YoY growth), of which $98 billion was data center revenue. The AI infrastructure market in 2024 was $189 billion. NVIDIA's data center revenue alone represents 52% of the total AI infrastructure market, demonstrating extreme market concentration.",
+      "source_documents": ["doc8_nvidia_dominance.md", "doc9_ai_market_analysis.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "market-trends", "entities": ["NVIDIA"]}
+    },
+    {
+      "question_id": "multi_026",
+      "question_text": "Compare enterprise AI adoption rates across different organization sizes and calculate the weighted adoption gap between enterprise and small organizations.",
+      "ground_truth": "Enterprise organizations (10,000+ employees) have 92% AI adoption, large (1,000-9,999) at 81%, medium (100-999) at 67%, and small (10-99) at 43%. The adoption gap between enterprise and small organizations is 49 percentage points (92% - 43%), revealing significant disparity in AI access based on organization size.",
+      "source_documents": ["doc21_enterprise_adoption.md"],
+      "difficulty": "medium",
+      "reasoning_hops": 2,
+      "metadata": {"topic": "market-trends", "entities": ["enterprise", "small business"]}
+    },
+    {
+      "question_id": "multi_027",
+      "question_text": "What are the top three industry sectors by AI adoption rate, and how does their combined adoption compare to government sector adoption?",
+      "ground_truth": "Top three sectors: Technology (94%), Financial Services (89%), Healthcare (82%). Their average adoption is 88.3%. Government sector has 61% adoption. The private sector leaders have 27.3 percentage points higher adoption than government, indicating slower public sector AI implementation despite high overall adoption rates.",
+      "source_documents": ["doc21_enterprise_adoption.md"],
+      "difficulty": "medium",
+      "reasoning_hops": 2,
+      "metadata": {"topic": "market-trends", "entities": ["technology sector", "financial services", "healthcare", "government"]}
+    },
+    {
+      "question_id": "multi_028",
+      "question_text": "How do the AI patent portfolios of IBM, Google, and Microsoft compare, and what is the combined total of their AI patents?",
+      "ground_truth": "IBM leads with 8,920 AI patents, Google has 6,740, and Microsoft has 5,980. Combined total: 21,640 AI patents across these three companies. IBM's portfolio exceeds Google by 2,180 patents and Microsoft by 2,940 patents, reflecting IBM's long-standing focus on enterprise AI despite not being a consumer AI leader.",
+      "source_documents": ["doc14_patent_innovation.md"],
+      "difficulty": "medium",
+      "reasoning_hops": 2,
+      "metadata": {"topic": "market-trends", "entities": ["IBM", "Google", "Microsoft"]}
+    },
+    {
+      "question_id": "multi_029",
+      "question_text": "Compare the number of AI patents filed by OpenAI versus traditional tech giants, and explain what this reveals about OpenAI's intellectual property strategy.",
+      "ground_truth": "OpenAI has filed fewer than 50 AI patents, while IBM filed 8,920, Google 6,740, Microsoft 5,980, Samsung 4,230, and NVIDIA 3,850. OpenAI's minimal patent activity (less than 1% of IBM's portfolio) reveals a strategy prioritizing trade secrets and first-mover advantage over patent protection, creating vulnerability to competitor patent challenges despite market leadership.",
+      "source_documents": ["doc14_patent_innovation.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "market-trends", "entities": ["OpenAI", "IBM", "Google", "Microsoft"]}
+    },
+    {
+      "question_id": "multi_030",
+      "question_text": "What is the total number of AI patents filed globally from 2020-2024, and how does the generative AI patent surge in 2024 compare to this total?",
+      "ground_truth": "Total AI patents filed globally (2020-2024): 287,000+, representing 150% increase. Generative AI patents in 2024: 51,487 applications. Generative AI patents represent approximately 18% of total AI patents filed over the 5-year period, demonstrating the explosive growth of generative AI innovation in just one year.",
+      "source_documents": ["doc14_patent_innovation.md"],
+      "difficulty": "medium",
+      "reasoning_hops": 2,
+      "metadata": {"topic": "market-trends", "entities": ["generative AI", "patents"]}
+    },
+    {
+      "question_id": "multi_031",
+      "question_text": "Compare the patent filing strategies between U.S., Chinese, and European companies. Which region has the most patents and by what margin?",
+      "ground_truth": "U.S. companies filed 126,000 AI patents (45% of global), Chinese companies filed 89,000 (31%), and European companies filed 34,000 (12%). The U.S. leads with 37,000 more patents than China and 92,000 more than Europe. The U.S.-China gap of 37,000 patents represents a 42% advantage for U.S. companies.",
+      "source_documents": ["doc14_patent_innovation.md"],
+      "difficulty": "medium",
+      "reasoning_hops": 2,
+      "metadata": {"topic": "market-trends", "entities": ["United States", "China", "Europe"]}
+    },
+    {
+      "question_id": "multi_032",
+      "question_text": "How do national AI competitiveness scores compare between the U.S., China, and EU, and which specific capability shows the greatest U.S. advantage?",
+      "ground_truth": "U.S. scores 100/100 (baseline), China 78/100, EU 65/100. The greatest U.S. advantage is in commercial deployment (98/100 vs China's 72/100 vs EU's 58/100), representing a 26-point lead over China and 40-point lead over EU. This reflects U.S. dominance in private sector AI adoption and product market fit.",
+      "source_documents": ["doc20_international_competition.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "cross-company-comparisons", "entities": ["United States", "China", "European Union"]}
+    },
+    {
+      "question_id": "multi_033",
+      "question_text": "What is the total AI investment by the U.S. government across various initiatives, and how does this compare to China's national AI strategy investment through 2030?",
+      "ground_truth": "U.S. government initiatives include: National AI Research Resource $1 billion pilot, CHIPS Act $52 billion (including AI chips), plus other programs. China's national AI strategy commits $150 billion through 2030. China's government commitment significantly exceeds U.S. federal AI investment, representing approximately 3x higher government funding despite lower private sector investment.",
+      "source_documents": ["doc20_international_competition.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "investment-patterns", "entities": ["United States", "China"]}
+    },
+    {
+      "question_id": "multi_034",
+      "question_text": "Compare the AI startup ecosystems across major U.S. cities. Which city has the most AI startups and what is the combined total across all listed U.S. cities?",
+      "ground_truth": "San Francisco Bay Area has 340 active AI startups (most), followed by New York (180), Los Angeles (95), Seattle (75), and Boston (70). Combined total across these five U.S. cities: 760 AI startups. The Bay Area alone represents 45% of AI startups across these major U.S. innovation hubs.",
+      "source_documents": ["doc16_startup_ecosystem.md"],
+      "difficulty": "medium",
+      "reasoning_hops": 2,
+      "metadata": {"topic": "market-trends", "entities": ["San Francisco", "New York", "Los Angeles", "Seattle", "Boston"]}
+    },
+    {
+      "question_id": "multi_035",
+      "question_text": "Which former OpenAI executives and co-founders left the company in 2024, and what were their destinations? What does this reveal about OpenAI's retention challenges?",
+      "ground_truth": "OpenAI departures in 2024: Mira Murati (CTO) resigned to pursue independent ventures, Bob McGrew (Chief Research Officer) left for stealth startup, John Schulman (co-founder) joined Anthropic for safety research, Greg Brockman (President) on extended sabbatical. Four senior leaders leaving within one year reveals significant retention challenges despite strong employee loyalty during the November 2023 crisis.",
+      "source_documents": ["doc12_executive_moves.md", "doc7_sam_altman_profile.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "executive-movements", "entities": ["OpenAI", "Mira Murati", "Bob McGrew", "John Schulman", "Greg Brockman", "Anthropic"]}
+    },
+    {
+      "question_id": "multi_036",
+      "question_text": "What is the estimated annual compensation for top-tier AI researchers at major companies, and how does this compare to AI CEO compensation?",
+      "ground_truth": "Top-tier AI researchers earn $2-5 million annually, principal scientists $1-3 million, and senior engineers $500K-$1.5 million. AI CEO compensation includes: Sam Altman $100M+, Dario Amodei $85M, Mustafa Suleyman $70M joining package, Alexandr Wang $50M. CEO compensation exceeds even top researchers by 20-50x, with Sam Altman's package being 20-50 times higher than top researchers.",
+      "source_documents": ["doc12_executive_moves.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "executive-movements", "entities": ["Sam Altman", "Dario Amodei", "Mustafa Suleyman", "Alexandr Wang"]}
+    },
+    {
+      "question_id": "multi_037",
+      "question_text": "How many AI companies did Apple acquire compared to Google and Microsoft, and what was the combined acquisition count?",
+      "ground_truth": "Apple acquired 32 AI companies (2023-2024), more than Google's 21 and Microsoft's 17. Combined total: 70 AI company acquisitions across these three tech giants. Despite acquiring the most companies, Apple still faces significant AI challenges, suggesting acquisition quantity doesn't guarantee successful AI integration.",
+      "source_documents": ["doc10_apple_ai_struggles.md", "doc11_investment_funding_trends.md"],
+      "difficulty": "medium",
+      "reasoning_hops": 2,
+      "metadata": {"topic": "executive-movements", "entities": ["Apple", "Google", "Microsoft"]}
+    },
+    {
+      "question_id": "multi_038",
+      "question_text": "What is the total value of major AI acquisitions in 2024 (including Meta's Scale AI, Adobe's Figma, Google's Character.AI, and Databricks' MosaicML)?",
+      "ground_truth": "Major 2024 AI acquisitions: Meta's Scale AI stake $14.8B, Adobe's Figma $20B, Google's Character.AI team $2.7B, Databricks' MosaicML $1.3B, Microsoft's Inflection AI $650M. Total value: $39.45 billion. These mega-deals represent 84% of the total $47.2 billion AI M&A market in 2024.",
+      "source_documents": ["doc19_acquisition_targets.md", "doc3_meta_scale_acquisition.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "investment-patterns", "entities": ["Meta", "Adobe", "Google", "Databricks", "Microsoft"]}
+    },
+    {
+      "question_id": "multi_039",
+      "question_text": "Compare the cloud AI service revenue of Microsoft Azure AI, AWS AI Services, and Google Cloud AI. What is the combined total and which provider has the highest growth rate?",
+      "ground_truth": "Microsoft Azure AI: $8.2 billion annual revenue (89% YoY growth), AWS AI Services: $6.7 billion (67% YoY growth), Google Cloud AI: $4.1 billion (112% YoY growth). Combined total: $19 billion. Google Cloud has the highest growth rate at 112% despite smallest revenue, indicating rapid catch-up efforts.",
+      "source_documents": ["doc17_cloud_wars.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "competitive-dynamics", "entities": ["Microsoft", "Azure", "AWS", "Google Cloud"]}
+    },
+    {
+      "question_id": "multi_040",
+      "question_text": "How does overall cloud market share compare to AI-specific cloud services revenue among AWS, Azure, and Google Cloud? Which provider shows the best AI revenue performance relative to overall cloud share?",
+      "ground_truth": "Overall cloud market share: AWS 31%, Azure 25%, Google Cloud 11%. AI service revenue: Azure $8.2B, AWS $6.7B, Google Cloud $4.1B. Azure generates the most AI revenue despite having 6 percentage points lower overall market share than AWS, indicating superior AI monetization. Azure's AI revenue is 22% higher than AWS despite 19% lower market share.",
+      "source_documents": ["doc17_cloud_wars.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 4,
+      "metadata": {"topic": "competitive-dynamics", "entities": ["AWS", "Azure", "Google Cloud", "Microsoft", "Amazon", "Google"]}
+    },
+    {
+      "question_id": "multi_041",
+      "question_text": "What are the three major cloud provider partnerships with AI companies, and what is the combined investment across these partnerships?",
+      "ground_truth": "Three major cloud-AI partnerships: (1) Microsoft-OpenAI with $13 billion investment, (2) Amazon-Anthropic with $8 billion investment, (3) Google-Anthropic with $3 billion investment. Combined investment: $24 billion. This represents significant cloud provider commitment to securing AI model partnerships for competitive advantage.",
+      "source_documents": ["doc17_cloud_wars.md", "doc5_microsoft_openai_tensions.md", "doc2_anthropic_amazon.md"],
+      "difficulty": "medium",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "competitive-dynamics", "entities": ["Microsoft", "OpenAI", "Amazon", "Anthropic", "Google"]}
+    },
+    {
+      "question_id": "multi_042",
+      "question_text": "How does Microsoft 365 Copilot adoption compare to Google Workspace AI adoption, and what does this reveal about enterprise productivity AI competition?",
+      "ground_truth": "Microsoft 365 Copilot: 130,000+ organizations using the service with $30 per user per month pricing. Google Workspace AI: 67,000+ organizations. Microsoft has nearly 2x the enterprise adoption (130K vs 67K organizations), reflecting Microsoft's dominant enterprise relationships and superior Office 365 integration despite Google's AI research leadership.",
+      "source_documents": ["doc17_cloud_wars.md", "doc15_competitive_analysis.md"],
+      "difficulty": "medium",
+      "reasoning_hops": 2,
+      "metadata": {"topic": "competitive-dynamics", "entities": ["Microsoft", "Google", "Copilot"]}
+    },
+    {
+      "question_id": "multi_043",
+      "question_text": "What is the combined valuation of the top three AI unicorns (CoreWeave, Perplexity, Harvey) created in 2024, and how does this compare to Scale AI's valuation?",
+      "ground_truth": "Top 2024 AI unicorns: CoreWeave $19B valuation, Perplexity $9B, Harvey $8B. Combined: $36 billion. Scale AI was valued at $13.8B before Meta's acquisition (then revalued to $30B with 49% stake). The three 2024 unicorns combined exceed Scale AI's pre-acquisition valuation by $22.2 billion, showing explosive value creation in AI infrastructure and applications.",
+      "source_documents": ["doc16_startup_ecosystem.md", "doc3_meta_scale_acquisition.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "market-trends", "entities": ["CoreWeave", "Perplexity", "Harvey", "Scale AI"]}
+    },
+    {
+      "question_id": "multi_044",
+      "question_text": "Compare the 2024 AI funding amounts across different categories (foundation models, enterprise applications, autonomous systems, vertical solutions) and identify which received the most investment.",
+      "ground_truth": "Foundation models and APIs: $34.2 billion, enterprise AI applications: $22.1 billion, vertical solutions: $15.7 billion, autonomous systems: $11.8 billion. Foundation models received the most funding at $34.2 billion, exceeding enterprise applications by $12.1 billion and representing 33% of total $104.2 billion AI funding.",
+      "source_documents": ["doc11_investment_funding_trends.md"],
+      "difficulty": "medium",
+      "reasoning_hops": 2,
+      "metadata": {"topic": "investment-patterns", "entities": ["foundation models", "enterprise AI", "autonomous systems"]}
+    },
+    {
+      "question_id": "multi_045",
+      "question_text": "What is the total annual R&D spending on AI by Big Tech companies, and how does this compare to the total AI venture capital funding in 2024?",
+      "ground_truth": "Big Tech AI R&D spending includes: Microsoft $65B, Google $52B, Amazon $48B, Meta $39B, Apple $31B (total $235B). Some of this includes infrastructure. NVIDIA spends $7B+ annually on R&D. Total AI venture capital funding in 2024: $104.2 billion. Big Tech R&D spending is more than 2x total VC funding, demonstrating corporate investment dominance.",
+      "source_documents": ["doc9_ai_market_analysis.md", "doc11_investment_funding_trends.md", "doc8_nvidia_dominance.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "investment-patterns", "entities": ["Microsoft", "Google", "Amazon", "Meta", "Apple"]}
+    },
+    {
+      "question_id": "multi_046",
+      "question_text": "How do seed and Series A AI funding round sizes in 2024 compare to 2023, and what is the percentage increase for each?",
+      "ground_truth": "Seed rounds: 2024 average $3-8M vs 2023 $2-5M (60% increase at midpoint). Series A rounds: 2024 average $15-35M vs 2023 $10-25M (43% increase at midpoint). Average deal size increased from $31.2M in 2023 to $47.3M in 2024 (52% increase overall). This reflects AI valuation inflation and investor willingness to deploy larger capital amounts.",
+      "source_documents": ["doc11_investment_funding_trends.md", "doc16_startup_ecosystem.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "investment-patterns", "entities": ["seed funding", "Series A"]}
+    },
+    {
+      "question_id": "multi_047",
+      "question_text": "Compare enterprise customer adoption numbers for Microsoft 365 Copilot, Databricks, and OpenAI. Which has the most enterprise customers?",
+      "ground_truth": "Microsoft 365 Copilot: 130,000+ organizations, Databricks: 10,000+ organizations, OpenAI: 92% of Fortune 500 (approximately 460 companies). Microsoft 365 Copilot has the most enterprise customers at 130,000+ organizations, demonstrating the advantage of embedding AI into existing productivity tools with large installed base.",
+      "source_documents": ["doc17_cloud_wars.md", "doc4_databricks_funding.md", "doc7_sam_altman_profile.md"],
+      "difficulty": "medium",
+      "reasoning_hops": 2,
+      "metadata": {"topic": "market-trends", "entities": ["Microsoft", "Databricks", "OpenAI"]}
+    },
+    {
+      "question_id": "multi_048",
+      "question_text": "What is OpenAI's projected revenue for 2025, and how does this compare to its 2024 ARR and NVIDIA's 2024 revenue?",
+      "ground_truth": "OpenAI's 2024 ARR: $3.6 billion, projected 2025 revenue: $11.6 billion (223% growth). NVIDIA's 2024 revenue: $126.5 billion. OpenAI's projected 2025 revenue would represent only 9.2% of NVIDIA's 2024 revenue, highlighting NVIDIA's massive scale advantage despite OpenAI's rapid growth and higher valuation multiple.",
+      "source_documents": ["doc1_openai_funding.md", "doc8_nvidia_dominance.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "market-trends", "entities": ["OpenAI", "NVIDIA"]}
+    },
+    {
+      "question_id": "multi_049",
+      "question_text": "Compare the gross margins of NVIDIA (73%), Scale AI (85%), and Databricks, and explain what this reveals about business model profitability in AI.",
+      "ground_truth": "NVIDIA: 73% gross margins (hardware with pricing power), Scale AI: 85% gross margins (high-margin data labeling services), Databricks: strong unit economics but specific margin not disclosed. Scale AI's 85% margins exceed even NVIDIA's dominant position, revealing that AI data services command premium pricing. Software/services businesses achieve higher margins than hardware despite NVIDIA's market dominance.",
+      "source_documents": ["doc8_nvidia_dominance.md", "doc3_meta_scale_acquisition.md", "doc4_databricks_funding.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "market-trends", "entities": ["NVIDIA", "Scale AI", "Databricks"]}
+    },
+    {
+      "question_id": "multi_050",
+      "question_text": "How does ChatGPT's user adoption speed compare to historical tech products, and what were OpenAI's user numbers across its products?",
+      "ground_truth": "ChatGPT reached 100 million users in 2 months, the fastest consumer product adoption in history. As of September 2024, OpenAI reported 300+ million weekly active users across ChatGPT and API. This represents 3x growth from the initial 100 million milestone, demonstrating sustained rapid adoption beyond initial viral growth.",
+      "source_documents": ["doc7_sam_altman_profile.md", "doc1_openai_funding.md"],
+      "difficulty": "medium",
+      "reasoning_hops": 2,
+      "metadata": {"topic": "market-trends", "entities": ["ChatGPT", "OpenAI"]}
+    },
+    {
+      "question_id": "multi_051",
+      "question_text": "What are the EU AI Act maximum penalties for different violation types, and what would a maximum fine represent for OpenAI at its current valuation?",
+      "ground_truth": "EU AI Act penalties: Maximum €35 million or 7% of global annual turnover for prohibited AI, €15 million or 3% for compliance violations, €7.5 million or 1.5% for information failures. For OpenAI with $3.6B ARR, maximum penalty of 7% would be $252 million. At €35 million minimum, either penalty is substantial but manageable given OpenAI's $157B valuation and funding capacity.",
+      "source_documents": ["doc13_regulatory_landscape.md", "doc1_openai_funding.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "market-trends", "entities": ["EU", "OpenAI"]}
+    },
+    {
+      "question_id": "multi_052",
+      "question_text": "Compare the cost savings achieved by enterprise AI implementations at Progressive Insurance, Walmart, JPMorgan Chase, and Mayo Clinic. What is the combined annual savings?",
+      "ground_truth": "Progressive Insurance: $12 million annual savings (customer service AI), Walmart: $1.2 billion annually (supply chain AI), JPMorgan Chase: $200 million annually (COIN contract intelligence), Mayo Clinic: undisclosed but $150 million AI investment. Combined disclosed savings: $1.412 billion annually across these three companies, demonstrating substantial ROI from enterprise AI adoption.",
+      "source_documents": ["doc21_enterprise_adoption.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "market-trends", "entities": ["Progressive", "Walmart", "JPMorgan", "Mayo Clinic"]}
+    },
+    {
+      "question_id": "multi_053",
+      "question_text": "What is the total amount spent by companies on NVIDIA H100 chips based on disclosed customer purchases, and what percentage of NVIDIA's 2024 revenue does this represent?",
+      "ground_truth": "Disclosed NVIDIA customer purchases: Microsoft $31B, Meta $18B, Google $13B, Amazon $9B. Total: $71 billion. NVIDIA's 2024 revenue: $126.5 billion. These four customers alone represent 56% of NVIDIA's total revenue, demonstrating extreme customer concentration risk despite market dominance.",
+      "source_documents": ["doc8_nvidia_dominance.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "competitive-dynamics", "entities": ["NVIDIA", "Microsoft", "Meta", "Google", "Amazon"]}
+    },
+    {
+      "question_id": "multi_054",
+      "question_text": "Compare the number of AI researchers at major companies: How does Google's AI research team (including DeepMind) compare to the number of AI companies acquired by Apple, and what does this reveal about different AI strategies?",
+      "ground_truth": "Google has 3,000+ AI/ML researchers across DeepMind and Google Research. Apple acquired 32 AI companies. Google's strategy emphasizes organic research talent development with 3,000+ researchers, while Apple pursues acquisition-based strategy buying 32 companies. Google's approach suggests long-term research investment while Apple's suggests attempting to buy capabilities rather than build them, yet Apple still faces significant AI challenges.",
+      "source_documents": ["doc6_google_ai_strategy.md", "doc10_apple_ai_struggles.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 3,
+      "metadata": {"topic": "cross-company-comparisons", "entities": ["Google", "Apple", "DeepMind"]}
+    },
+    {
+      "question_id": "multi_055",
+      "question_text": "What is the combined value of AI M&A transactions in 2024, and how does this compare to the combined total of mega-rounds ($1B+) raised by AI startups in the same year?",
+      "ground_truth": "Total AI M&A value in 2024: $47.2 billion across 312 deals. AI mega-rounds in 2024: approximately $33.9 billion (OpenAI $6.6B, xAI $6.0B, Anthropic $4.0B, Databricks $10B, CoreWeave $1.1B, Scale AI $1.0B, Perplexity $1.0B, Character.AI $2.7B, Harvey $1.5B). M&A transactions exceeded mega-round fundraising by $13.3 billion, indicating active consolidation alongside continued large-scale funding.",
+      "source_documents": ["doc19_acquisition_targets.md", "doc11_investment_funding_trends.md"],
+      "difficulty": "hard",
+      "reasoning_hops": 4,
+      "metadata": {"topic": "investment-patterns", "entities": ["M&A", "funding"]}
+    }
+  ]
+}
