@@ -8,6 +8,7 @@ import click
 import logging
 from pathlib import Path
 import sys
+import pandas as pd
 
 # Add src to path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -201,6 +202,144 @@ def reset():
         click.echo("\nSystem reset complete!")
     
     asyncio.run(run())
+
+
+@cli.command()
+@click.argument('result_files', nargs=-1, type=click.Path(exists=True), required=True)
+@click.option('--output-dir', default='./benchmarks/results', help='Output directory for figures and CSVs')
+@click.option('--show-plots/--no-show-plots', default=False, help='Display plots interactively')
+@click.option('--format', type=click.Choice(['png', 'pdf', 'svg']), default='png', help='Figure format')
+def analyze(result_files, output_dir, show_plots, format):
+    """Analyze evaluation results and generate visualizations.
+    
+    RESULT_FILES: One or more evaluation result JSON files to analyze.
+    
+    Example:
+        python cli.py analyze benchmarks/results/eval_*.json
+        python cli.py analyze benchmarks/results/eval_20260110_*.json --output-dir ./analysis_output
+    """
+    from src.analysis.metrics import (
+        load_evaluation_results,
+        extract_detailed_results_to_dataframe,
+        calculate_summary_stats,
+        compare_methods,
+        generate_text_report,
+        export_to_csv,
+    )
+    from src.analysis.visualizations import (
+        plot_score_comparison,
+        plot_latency_comparison,
+        plot_chunk_count_distribution,
+        plot_comprehensive_comparison,
+        plot_per_question_heatmap,
+    )
+    import matplotlib.pyplot as plt
+    
+    output_path = Path(output_dir)
+    figures_path = output_path / 'figures'
+    figures_path.mkdir(parents=True, exist_ok=True)
+    
+    click.echo(f"\n{'='*80}")
+    click.echo("RAG EVALUATION ANALYSIS")
+    click.echo(f"{'='*80}\n")
+    click.echo(f"Analyzing {len(result_files)} result file(s)...")
+    
+    # Load all results
+    all_dfs = []
+    for result_file in result_files:
+        click.echo(f"  Loading: {Path(result_file).name}")
+        results = load_evaluation_results(result_file)
+        df = extract_detailed_results_to_dataframe(results)
+        df['source_file'] = Path(result_file).name
+        all_dfs.append(df)
+    
+    # Combine all data
+    combined_df = pd.concat(all_dfs, ignore_index=True) if len(all_dfs) > 1 else all_dfs[0]
+    
+    click.echo(f"\n✓ Loaded {len(combined_df)} total result entries")
+    click.echo(f"  Methods: {', '.join(combined_df['method'].unique())}")
+    click.echo(f"  Questions: {combined_df['question_id'].nunique()}")
+    
+    # Generate text report
+    click.echo(f"\n{'='*80}")
+    click.echo("GENERATING REPORT")
+    click.echo(f"{'='*80}")
+    
+    # Use first result file for main report
+    main_results = load_evaluation_results(result_files[0])
+    report_text = generate_text_report(main_results)
+    click.echo(report_text)
+    
+    # Save report
+    report_path = output_path / 'analysis_report.txt'
+    report_path.write_text(report_text)
+    click.echo(f"\n✓ Saved text report to: {report_path}")
+    
+    # Export CSVs
+    click.echo(f"\n{'='*80}")
+    click.echo("EXPORTING DATA")
+    click.echo(f"{'='*80}")
+    
+    # Detailed results CSV
+    detailed_csv = output_path / 'detailed_results.csv'
+    export_to_csv(combined_df, detailed_csv)
+    
+    # Summary statistics CSV
+    summary_stats = calculate_summary_stats(combined_df)
+    summary_csv = output_path / 'summary_statistics.csv'
+    export_to_csv(summary_stats, summary_csv)
+    
+    # Method comparison CSV
+    comparison_df = compare_methods(main_results)
+    comparison_csv = output_path / 'method_comparison.csv'
+    export_to_csv(comparison_df, comparison_csv)
+    
+    # Generate visualizations
+    click.echo(f"\n{'='*80}")
+    click.echo("GENERATING VISUALIZATIONS")
+    click.echo(f"{'='*80}")
+    
+    figures = [
+        ('score_comparison', lambda: plot_score_comparison(combined_df)),
+        ('latency_comparison', lambda: plot_latency_comparison(combined_df)),
+        ('chunk_distribution', lambda: plot_chunk_count_distribution(combined_df)),
+        ('comprehensive_dashboard', lambda: plot_comprehensive_comparison(combined_df)),
+        ('question_heatmap', lambda: plot_per_question_heatmap(combined_df)),
+    ]
+    
+    saved_figures = []
+    for fig_name, plot_func in figures:
+        fig_path = figures_path / f'{fig_name}.{format}'
+        click.echo(f"  Generating {fig_name}...")
+        
+        fig = plot_func()
+        plt.savefig(fig_path, dpi=300, bbox_inches='tight', format=format)
+        
+        if not show_plots:
+            plt.close(fig)
+        
+        saved_figures.append(fig_path)
+        click.echo(f"    ✓ Saved: {fig_path}")
+    
+    # Show plots if requested
+    if show_plots:
+        click.echo("\nDisplaying plots...")
+        plt.show()
+    
+    # Summary
+    click.echo(f"\n{'='*80}")
+    click.echo("ANALYSIS COMPLETE")
+    click.echo(f"{'='*80}")
+    click.echo(f"\nGenerated {len(saved_figures)} figures:")
+    for fig_path in saved_figures:
+        click.echo(f"  - {fig_path}")
+    
+    click.echo(f"\nExported {3} CSV files:")
+    click.echo(f"  - {detailed_csv}")
+    click.echo(f"  - {summary_csv}")
+    click.echo(f"  - {comparison_csv}")
+    
+    click.echo(f"\nAll outputs saved to: {output_path}")
 
 
 if __name__ == '__main__':
