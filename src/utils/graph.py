@@ -49,7 +49,11 @@ class GraphDatabaseManager:
             try:
                 self.driver = AsyncGraphDatabase.driver(
                     settings.neo4j.uri,
-                    auth=(settings.neo4j.user, settings.neo4j.password)
+                    auth=(settings.neo4j.user, settings.neo4j.password),
+                    max_connection_pool_size=50,
+                    connection_acquisition_timeout=60,
+                    max_connection_lifetime=3600,
+                    keep_alive=True
                 )
                 
                 # Verify connection
@@ -186,7 +190,8 @@ class GraphDatabaseManager:
         self,
         name: str,
         content: str,
-        source_description: str
+        source_description: str,
+        timeout: int = 120
     ) -> AddEpisodeResults:
         """
         Add an episode (document chunk) to the knowledge graph using Graphiti.
@@ -195,18 +200,31 @@ class GraphDatabaseManager:
         Note: Graphiti does not support metadata parameter in add_episode.
         Use source_description to provide context about the episode.
         
+        Args:
+            timeout: Maximum time in seconds to wait for episode creation (default: 120s)
+        
         Returns:
             AddEpisodeResults containing the episode, entities, and relationships
+        
+        Raises:
+            asyncio.TimeoutError: If operation exceeds timeout
         """
-        results = await self.graphiti.add_episode(
-            name=name,
-            episode_body=content,
-            source=EpisodeType.text,
-            source_description=source_description,
-            reference_time=datetime.now()
-        )
-        logger.debug(f"Added episode: {name}")
-        return results
+        try:
+            results = await asyncio.wait_for(
+                self.graphiti.add_episode(
+                    name=name,
+                    episode_body=content,
+                    source=EpisodeType.text,
+                    source_description=source_description,
+                    reference_time=datetime.now()
+                ),
+                timeout=timeout
+            )
+            logger.debug(f"Added episode: {name}")
+            return results
+        except asyncio.TimeoutError:
+            logger.error(f"Timeout ({timeout}s) adding episode: {name}")
+            raise
     
     async def search_entities(
         self,
@@ -415,59 +433,116 @@ class GraphDatabaseManager:
         max_hops: int = 2
     ) -> List[Dict[str, Any]]:
         """
-        Knowledge Graph-based retrieval:
+        Knowledge Graph-based retrieval with multi-hop traversal:
         1. Find relevant entities semantically
-        2. Traverse to connected chunks
-        3. Rank by relevance
+        2. Expand entities through graph relationships (multi-hop)
+        3. Traverse to connected chunks
+        4. Rank by relevance (direct matches boosted)
         """
-        # Step 1: Search for relevant entities (Graphiti returns edges/relationships)
-        search_results = await self.search_entities(query_text, limit=top_k * 2)
+        from config.settings import get_settings
+        settings = get_settings()
+        
+        # Step 1: Search for relevant entities with higher limit for better coverage
+        entity_multiplier = getattr(settings.rag, 'entity_search_multiplier', 5)
+        search_limit = top_k * entity_multiplier
+        search_results = await self.search_entities(query_text, limit=search_limit)
         
         if not search_results:
             logger.warning("No entities found for query")
             return []
         
-        # Extract unique entity UUIDs from edges (relationships between entities)
-        entity_ids = set()
+        # Extract unique entity UUIDs from search results
+        direct_entity_ids = set()
         for result in search_results:
             # Graphiti search returns EntityEdge objects
             if hasattr(result, 'source_node_uuid'):
-                entity_ids.add(result.source_node_uuid)
+                direct_entity_ids.add(result.source_node_uuid)
             if hasattr(result, 'target_node_uuid'):
-                entity_ids.add(result.target_node_uuid)
+                direct_entity_ids.add(result.target_node_uuid)
             # If it's actually an EntityNode, use its UUID directly
             elif hasattr(result, 'uuid') and hasattr(result, 'name'):
-                entity_ids.add(result.uuid)
+                direct_entity_ids.add(result.uuid)
         
-        entity_ids = list(entity_ids)
-        logger.info(f"Extracted {len(entity_ids)} unique entity UUIDs from search results")
+        direct_entity_ids = list(direct_entity_ids)
+        logger.info(f"Found {len(direct_entity_ids)} direct entities from search")
         
-        # Step 2: Get chunks connected to these entities via Episodic nodes
-        # Path: Chunk -[:HAS_EPISODE]-> Episodic -[:MENTIONS]-> Entity
-        query = """
+        # Step 2: Multi-hop expansion - find related entities
+        enable_multi_hop = getattr(settings.rag, 'kg_enable_multi_hop', True)
+        if enable_multi_hop and max_hops > 1:
+            expansion_query = """
+                UNWIND $seed_entities as seed_uuid
+                MATCH (seed:Entity {uuid: seed_uuid})
+                MATCH path = (seed)-[*1..$max_hops]-(related:Entity)
+                WITH DISTINCT related, seed, length(path) as distance
+                WHERE distance <= $max_hops
+                RETURN related.uuid as entity_uuid, 
+                       distance,
+                       seed.uuid IN $seed_entities as is_direct
+                ORDER BY distance, is_direct DESC
+                LIMIT $expansion_limit
+            """
+            
+            async with self.driver.session() as session:
+                result = await session.run(
+                    expansion_query,
+                    seed_entities=direct_entity_ids,
+                    max_hops=max_hops,
+                    expansion_limit=search_limit * 2  # Allow more related entities
+                )
+                expansion_records = await result.data()
+            
+            # Combine direct and expanded entities
+            all_entity_ids = direct_entity_ids.copy()
+            expanded_count = 0
+            for record in expansion_records:
+                entity_uuid = record['entity_uuid']
+                if entity_uuid not in all_entity_ids:
+                    all_entity_ids.append(entity_uuid)
+                    expanded_count += 1
+            
+            logger.info(f"Expanded to {len(all_entity_ids)} entities total (+{expanded_count} via multi-hop)")
+        else:
+            all_entity_ids = direct_entity_ids
+            logger.info(f"Multi-hop disabled, using {len(all_entity_ids)} direct entities only")
+        
+        # Step 3: Get chunks connected to these entities via Episodic nodes
+        # Apply relevance boost for direct entity matches
+        relevance_boost = getattr(settings.rag, 'kg_relevance_boost', 0.3)
+        
+        retrieval_query = """
             UNWIND $entity_ids as entity_uuid
             MATCH (e:Entity {uuid: entity_uuid})
             MATCH (e)<-[:MENTIONS]-(ep:Episodic)
             MATCH (c:Chunk)-[:HAS_EPISODE]->(ep)
-            WITH DISTINCT c, COUNT(DISTINCT e) as entity_count
-            ORDER BY entity_count DESC
+            WITH c, 
+                 COUNT(DISTINCT e) as entity_count,
+                 SUM(CASE WHEN e.uuid IN $direct_entities THEN 1 ELSE 0 END) as direct_count,
+                 COUNT(DISTINCT ep) as episode_count
+            WITH c, entity_count, direct_count, episode_count,
+                 (entity_count + (direct_count * $boost)) as relevance_score
+            ORDER BY relevance_score DESC, episode_count DESC
             LIMIT $top_k
             RETURN c.chunk_id as chunk_id,
                    c.chunk_text as chunk_text,
                    c.document_id as document_id,
                    c.chunk_index as chunk_index,
-                   entity_count as relevance_score
+                   relevance_score,
+                   entity_count,
+                   direct_count,
+                   episode_count
         """
         
         async with self.driver.session() as session:
             result = await session.run(
-                query,
-                entity_ids=entity_ids,  # Now these are UUIDs
+                retrieval_query,
+                entity_ids=all_entity_ids,
+                direct_entities=direct_entity_ids,
+                boost=relevance_boost,
                 top_k=top_k
             )
             records = await result.data()
         
-        logger.info(f"KG retrieval returned {len(records)} chunks")
+        logger.info(f"KG retrieval returned {len(records)} chunks (max_hops={max_hops}, entities={len(all_entity_ids)})")
         return records
     
     async def hybrid_kg_retrieve(

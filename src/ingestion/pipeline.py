@@ -269,38 +269,53 @@ class IngestionPipeline:
                     doc_chunk_map[doc_id] = []
                 doc_chunk_map[doc_id].append(chunk)
             
-            # Process each document's chunks
+            # Process each document's chunks with rate limiting
             for doc_id, chunks in doc_chunk_map.items():
                 # Find corresponding document
                 doc = next((d for i, d in enumerate(documents) if i == 0), None)
                 if not doc:
                     continue
                 
-                # Add episodes to Graphiti (max 10 per doc to avoid overwhelming)
-                for i, chunk in enumerate(chunks[:10]):
-
-                        try:
-                            results = await self.graph.add_episode(
-                                name=f"{doc.title} - Chunk {chunk['chunk_index']}",
-                                content=chunk['chunk_text'],
-                                source_description=f"Chunk {chunk['chunk_index']} from document '{doc.title}' (source: {doc.source_path}, chunk_id: {chunk['chunk_id']}, document_id: {doc_id})"
-                            )
-                            entities_created += 1
-                            
-                            # Link Chunk node to Episodic node so we can traverse Chunk->Episodic->Entity
-                            # AddEpisodeResults has an 'episode' field which is the EpisodicNode
-                            await self.graph.link_chunk_to_episodic(chunk['chunk_id'], results.episode.uuid)
-                            
-                            logger.debug(f"Added episode for chunk {chunk['chunk_id']}")
-                        except Exception as e:
-                            error_msg = str(e).lower()
-                            if "rate limit" in error_msg:
-                                logger.warning(f"Rate limit hit when adding episode for chunk {chunk['chunk_id']}")
-                                logger.error(f"{e}")
-                                break
-                            else:
-                                logger.warning(f"Error adding episode for chunk {chunk['chunk_id']}: {e}")
-                                continue 
+                # Add episodes to Graphiti with configurable limits
+                max_chunks = settings.ingestion.kg_max_chunks_per_doc
+                chunks_to_process = chunks[:max_chunks]
+                logger.info(f"Processing {len(chunks_to_process)} chunks (out of {len(chunks)}) for document '{doc.title}'")
+                
+                for i, chunk in enumerate(chunks_to_process):
+                    try:
+                        # Add delay between API calls to prevent rate limiting and connection issues
+                        if i > 0:
+                            await asyncio.sleep(settings.ingestion.kg_episode_delay)
+                        
+                        logger.info(f"Processing chunk {i+1}/{len(chunks_to_process)} for document '{doc.title}'")
+                        
+                        results = await self.graph.add_episode(
+                            name=f"{doc.title} - Chunk {chunk['chunk_index']}",
+                            content=chunk['chunk_text'],
+                            source_description=f"Chunk {chunk['chunk_index']} from document '{doc.title}' (source: {doc.source_path}, chunk_id: {chunk['chunk_id']}, document_id: {doc_id})",
+                            timeout=settings.ingestion.kg_episode_timeout
+                        )
+                        entities_created += 1
+                        
+                        # Link Chunk node to Episodic node so we can traverse Chunk->Episodic->Entity
+                        # AddEpisodeResults has an 'episode' field which is the EpisodicNode
+                        await self.graph.link_chunk_to_episodic(chunk['chunk_id'], results.episode.uuid)
+                        
+                        logger.info(f"✓ Successfully added episode for chunk {chunk['chunk_id']} ({entities_created} total)")
+                        
+                    except asyncio.TimeoutError:
+                        logger.error(f"Timeout processing chunk {chunk['chunk_id']} - skipping")
+                        continue
+                    except Exception as e:
+                        error_msg = str(e).lower()
+                        if "rate limit" in error_msg:
+                            logger.warning(f"Rate limit hit - waiting 60 seconds before continuing")
+                            logger.error(f"{e}")
+                            await asyncio.sleep(60)  # Wait 60 seconds on rate limit
+                            continue  # Try to continue with next chunk
+                        else:
+                            logger.warning(f"Error adding episode for chunk {chunk['chunk_id']}: {e}")
+                            continue 
             
             logger.info(f"Entity extraction complete: {entities_created} episodes added")
             

@@ -77,6 +77,9 @@ class IngestionSettings(BaseSettings):
     max_chunk_size: int = Field(default=1024, ge=1, description="Maximum chunk size")
     use_semantic_chunking: bool = Field(default=True, description="Use semantic chunking")
     llm_model: str = Field(default="gemini-1.5-flash", description="LLM for graph building")
+    kg_episode_timeout: int = Field(default=120, ge=30, description="Timeout for adding episode to knowledge graph (seconds)")
+    kg_episode_delay: float = Field(default=1.0, ge=0, description="Delay between episode additions (seconds)")
+    kg_max_chunks_per_doc: int = Field(default=1000, ge=1, description="Maximum chunks per document to process for KG (1000=effectively unlimited)")
 
 
 class BenchmarkSettings(BaseSettings):
@@ -116,6 +119,9 @@ class RAGSettings(BaseSettings):
     
     top_k: int = Field(default=5, ge=1, description="Number of chunks to retrieve")
     max_hops: int = Field(default=3, ge=1, le=10, description="Max hops for graph traversal")
+    entity_search_multiplier: int = Field(default=5, ge=1, description="Multiplier for initial entity search (top_k * multiplier)")
+    kg_enable_multi_hop: bool = Field(default=True, description="Enable multi-hop graph traversal")
+    kg_relevance_boost: float = Field(default=0.3, ge=0.0, le=1.0, description="Score boost for direct entity matches")
     hybrid_fusion_strategy: Literal["rrf", "weighted", "concatenation"] = Field(
         default="rrf",
         description="Fusion strategy for hybrid RAG"

@@ -665,9 +665,15 @@ uv run python cli.py evaluate --num-questions -1 --dataset big_tech_curated --ou
 uv run python cli.py analyze .\benchmarks\big_tech_curated_results\eval_*.json --output-dir ./benchmarks/big_tech_curated_results
 
 ## env  related
-make clean
-make setup
-mkae
+# Start PostgreSQL and Neo4j
+docker-compose up -d
+
+# Wait for services to be healthy
+docker-compose ps
+
+# Initialize databases
+uv run python -m src.utils.db init
+uv run python -m src.utils.graph init
 
 ```
 
