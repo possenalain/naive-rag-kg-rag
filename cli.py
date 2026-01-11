@@ -17,13 +17,18 @@ from src.ingestion.pipeline import IngestionPipeline
 from src.evaluation.orchestrator import EvaluationOrchestrator
 from src.utils.db import get_db
 from src.utils.graph import get_graph
+from src.utils.logging_config import setup_logging, setup_quiet_loggers
 from config.settings import get_settings
 
-# Setup logging
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+# Setup logging with file output
+setup_logging(
+    log_level="INFO",
+    log_dir="./logs",
+    log_to_file=True,
+    log_to_console=True
 )
+setup_quiet_loggers()
+
 logger = logging.getLogger(__name__)
 settings = get_settings()
 

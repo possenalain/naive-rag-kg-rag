@@ -658,11 +658,11 @@ echo y | uv run python cli.py reset; uv run python cli.py ingest .\data\big_tech
 # all
 uv run python cli.py reset; uv run python cli.py ingest .\data\datasets 
 
-# evaluate 10 questions
-uv run python cli.py evaluate --num-questions -1 --dataset big_tech_curated --output-dir .\benchmarks\big_tech_curated_results
+# evaluate all questions
+uv run python cli.py evaluate --num-questions -1 --dataset big_tech_curated --output-dir .\benchmarks\big_tech_curated_results_v2
 
 # analyze results
-uv run python cli.py analyze .\benchmarks\big_tech_curated_results\eval_*.json --output-dir ./benchmarks/big_tech_curated_results
+uv run python cli.py analyze .\benchmarks\big_tech_curated_results\eval_*.json --output-dir ./benchmarks/big_tech_curated_results_v2
 
 ## env  related
 # Start PostgreSQL and Neo4j

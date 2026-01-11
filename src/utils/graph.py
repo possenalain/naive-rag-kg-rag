@@ -469,12 +469,14 @@ class GraphDatabaseManager:
         # Step 2: Multi-hop expansion - find related entities
         enable_multi_hop = getattr(settings.rag, 'kg_enable_multi_hop', True)
         if enable_multi_hop and max_hops > 1:
-            expansion_query = """
+            # Note: max_hops must be embedded in query string, not passed as parameter
+            # Neo4j doesn't allow parameters in variable-length patterns like [*1..$max_hops]
+            expansion_query = f"""
                 UNWIND $seed_entities as seed_uuid
-                MATCH (seed:Entity {uuid: seed_uuid})
-                MATCH path = (seed)-[*1..$max_hops]-(related:Entity)
+                MATCH (seed:Entity {{uuid: seed_uuid}})
+                MATCH path = (seed)-[*1..{max_hops}]-(related:Entity)
                 WITH DISTINCT related, seed, length(path) as distance
-                WHERE distance <= $max_hops
+                WHERE distance <= {max_hops}
                 RETURN related.uuid as entity_uuid, 
                        distance,
                        seed.uuid IN $seed_entities as is_direct
@@ -486,7 +488,6 @@ class GraphDatabaseManager:
                 result = await session.run(
                     expansion_query,
                     seed_entities=direct_entity_ids,
-                    max_hops=max_hops,
                     expansion_limit=search_limit * 2  # Allow more related entities
                 )
                 expansion_records = await result.data()
