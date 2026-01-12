@@ -507,9 +507,15 @@ class GraphDatabaseManager:
             logger.info(f"Multi-hop disabled, using {len(all_entity_ids)} direct entities only")
         
         # Step 3: Get chunks connected to these entities via Episodic nodes
-        # Apply relevance boost for direct entity matches
+        # Use precision-based scoring that heavily favors high direct-entity ratios
         relevance_boost = getattr(settings.rag, 'kg_relevance_boost', 0.3)
+        min_entity_ratio = getattr(settings.rag, 'kg_min_entity_ratio', 0.3)
         
+        # Precision-focused query:
+        # 1. Calculate direct_ratio = direct_count / entity_count (precision)
+        # 2. Filter chunks where direct_ratio >= min_entity_ratio
+        # 3. Score = (direct_count^2) * direct_ratio * boost
+        #    This heavily favors chunks where most entities are direct matches
         retrieval_query = """
             UNWIND $entity_ids as entity_uuid
             MATCH (e:Entity {uuid: entity_uuid})
@@ -520,8 +526,11 @@ class GraphDatabaseManager:
                  SUM(CASE WHEN e.uuid IN $direct_entities THEN 1 ELSE 0 END) as direct_count,
                  COUNT(DISTINCT ep) as episode_count
             WITH c, entity_count, direct_count, episode_count,
-                 (entity_count + (direct_count * $boost)) as relevance_score
-            ORDER BY relevance_score DESC, episode_count DESC
+                 toFloat(direct_count) / toFloat(entity_count) as direct_ratio
+            WHERE direct_ratio >= $min_ratio
+            WITH c, entity_count, direct_count, episode_count, direct_ratio,
+                 (direct_count * direct_count * direct_ratio * $boost) as relevance_score
+            ORDER BY relevance_score DESC, direct_count DESC, episode_count DESC
             LIMIT $top_k
             RETURN c.chunk_id as chunk_id,
                    c.chunk_text as chunk_text,
@@ -530,7 +539,8 @@ class GraphDatabaseManager:
                    relevance_score,
                    entity_count,
                    direct_count,
-                   episode_count
+                   episode_count,
+                   direct_ratio
         """
         
         async with self.driver.session() as session:
@@ -539,11 +549,27 @@ class GraphDatabaseManager:
                 entity_ids=all_entity_ids,
                 direct_entities=direct_entity_ids,
                 boost=relevance_boost,
+                min_ratio=min_entity_ratio,
                 top_k=top_k
             )
             records = await result.data()
         
-        logger.info(f"KG retrieval returned {len(records)} chunks (max_hops={max_hops}, entities={len(all_entity_ids)})")
+        # Log detailed statistics for debugging
+        if records:
+            avg_ratio = sum(r.get('direct_ratio', 0) for r in records) / len(records)
+            avg_direct = sum(r.get('direct_count', 0) for r in records) / len(records)
+            logger.info(
+                f"KG retrieval: {len(records)} chunks, "
+                f"avg direct_ratio={avg_ratio:.2f}, avg direct_count={avg_direct:.1f}, "
+                f"entities={len(all_entity_ids)}, min_ratio={min_entity_ratio}"
+            )
+        else:
+            logger.warning(
+                f"KG retrieval returned 0 chunks! "
+                f"Try lowering min_entity_ratio (current: {min_entity_ratio}) "
+                f"or increasing entity_search_multiplier"
+            )
+        
         return records
     
     async def hybrid_kg_retrieve(
