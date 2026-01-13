@@ -121,11 +121,10 @@ def evaluate(dataset, dataset_path, num_questions, output_dir):
 
 
 @cli.command()
-@click.argument('question')
 @click.option('--variant', type=click.Choice(['naive', 'kg', 'hybrid']), default='hybrid')
 @click.option('--top-k', default=5, type=int, help='Number of chunks to retrieve')
-def query(question, variant, top_k):
-    """Ask a question using specified RAG variant."""
+def query(variant, top_k):
+    """Interactive chat session using specified RAG variant. Type 'exit' or 'quit' to end."""
     async def run():
         from src.rag_variants.naive_rag import NaiveRAG
         from src.rag_variants.kg_rag import KnowledgeGraphRAG
@@ -139,15 +138,45 @@ def query(question, variant, top_k):
         else:
             rag = HybridRAG(top_k=top_k)
         
+        click.echo(f"\n╔══════════════════════════════════════════════════════════╗")
+        click.echo(f"║  RAG Interactive Query Session ({variant.upper()}){'': <{63-len(variant)}}║")
+        click.echo(f"╚══════════════════════════════════════════════════════════╝")
+        click.echo(f"\nInitializing {variant.upper()} RAG system...")
+        
         await rag.initialize()
         
-        click.echo(f"\nQuery ({variant.upper()} RAG): {question}")
-        click.echo("Generating answer...")
+        click.echo(f"✓ Ready! Type your questions (or 'exit'/'quit' to end)\n")
         
-        result = await rag.generate(question)
-        
-        click.echo(f"\n{result['answer']}")
-        click.echo(f"\n[Retrieved {len(result['retrieved_chunks'])} chunks in {result['latency_ms']:.2f}ms]")
+        # Interactive loop
+        while True:
+            try:
+                # Get user input
+                question = click.prompt("\n❯ You", type=str, prompt_suffix=": ")
+                
+                # Check for exit commands
+                if question.strip().lower() in ['exit', 'quit', 'q']:
+                    click.echo("\n👋 Goodbye!")
+                    break
+                
+                # Skip empty questions
+                if not question.strip():
+                    continue
+                
+                # Generate answer
+                click.echo(f"\n💭 {variant.upper()} RAG: Thinking...")
+                result = await rag.generate(question)
+                
+                # Display answer
+                click.echo(f"\n✓ Answer:\n")
+                click.echo(result['answer'])
+                click.echo(f"\n📊 [Retrieved {len(result['retrieved_chunks'])} chunks in {result['latency_ms']:.2f}ms]")
+                
+            except (KeyboardInterrupt, EOFError):
+                click.echo("\n\n👋 Goodbye!")
+                break
+            except Exception as e:
+                click.echo(f"\n❌ Error: {str(e)}", err=True)
+                logger.error(f"Query error: {e}", exc_info=True)
     
     asyncio.run(run())
 
