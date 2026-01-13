@@ -116,30 +116,85 @@ services:
     profiles:
       - with-cache
 
-  # Application (Optional - if you want to run the app in Docker)
-  # app:
-  #   build:
-  #     context: .
-  #     dockerfile: docker/app/Dockerfile
-  #   container_name: rag_app
-  #   environment:
-  #     - POSTGRES_URL=postgresql://${POSTGRES_USER:-raguser}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-rag_benchmark}
-  #     - NEO4J_URI=bolt://neo4j:7687
-  #     - NEO4J_USER=neo4j
-  #     - NEO4J_PASSWORD=${NEO4J_PASSWORD}
-  #   volumes:
-  #     - ./src:/app/src:ro
-  #     - ./data:/app/data
-  #     - ./benchmarks:/app/benchmarks
-  #     - ./logs:/app/logs
-  #   depends_on:
-  #     postgres:
-  #       condition: service_healthy
-  #     neo4j:
-  #       condition: service_healthy
-  #   networks:
-  #     - rag_network
-  #   restart: unless-stopped
+  # Application - RAG System with Agent
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: rag_app
+    environment:
+      # Database connections
+      - POSTGRES_URL=postgresql://${POSTGRES_USER:-raguser}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-rag_benchmark}
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD}
+      
+      # LLM Configuration
+      - LLM_PROVIDER=${LLM_PROVIDER:-gemini}
+      - LLM_MODEL_NAME=${LLM_MODEL_NAME:-gemini-2.0-flash}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - LLM_BASE_URL=${LLM_BASE_URL}
+      
+      # Embedding Configuration
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-gemini}
+      - EMBEDDING_MODEL_NAME=${EMBEDDING_MODEL_NAME:-text-embedding-004}
+      - EMBEDDING_API_KEY=${EMBEDDING_API_KEY}
+      
+      # RAG Configuration (threshold-based retrieval)
+      - RAG_TOP_K=${RAG_TOP_K:-5}
+      - RAG_MAX_CHUNKS=${RAG_MAX_CHUNKS:-20}
+      - RAG_VECTOR_SIMILARITY_THRESHOLD=${RAG_VECTOR_SIMILARITY_THRESHOLD:-0.7}
+      - RAG_KG_MIN_ENTITY_RATIO=${RAG_KG_MIN_ENTITY_RATIO:-0.3}
+    volumes:
+      - ./data:/app/data
+      - ./benchmarks:/app/benchmarks
+      - ./logs:/app/logs
+      - ./cache:/app/cache
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    networks:
+      - rag_network
+    restart: unless-stopped
+    profiles:
+      - app
+    # Default: show help
+    command: ["python", "cli.py", "--help"]
+  
+  # Development environment with all tools
+  dev:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    container_name: rag_dev
+    environment:
+      # Same as app but with dev settings
+      - POSTGRES_URL=postgresql://${POSTGRES_USER:-raguser}:${POSTGRES_PASSWORD}@postgres:5432/${POSTGRES_DB:-rag_benchmark}
+      - NEO4J_URI=bolt://neo4j:7687
+      - NEO4J_USER=neo4j
+      - NEO4J_PASSWORD=${NEO4J_PASSWORD}
+      - LLM_PROVIDER=${LLM_PROVIDER:-gemini}
+      - LLM_API_KEY=${LLM_API_KEY}
+      - EMBEDDING_PROVIDER=${EMBEDDING_PROVIDER:-gemini}
+      - EMBEDDING_API_KEY=${EMBEDDING_API_KEY}
+    volumes:
+      # Mount entire workspace for live development
+      - .:/workspace
+      - /workspace/.venv  # Exclude venv from mount
+    depends_on:
+      postgres:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+    networks:
+      - rag_network
+    stdin_open: true
+    tty: true
+    profiles:
+      - dev
+    command: ["/bin/bash"]
 
 volumes:
   postgres_data:

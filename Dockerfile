@@ -19,26 +19,33 @@
 # ============================================================================
 
 # Multi-stage build using UV for fast dependency installation
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 # Install UV
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
+# Set environment variables for faster builds
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
 # Set working directory
 WORKDIR /app
 
-# Copy dependency files
-COPY pyproject.toml .
-COPY .python-version .
-COPY README.md .
+# Copy dependency files first for better caching
+COPY pyproject.toml uv.lock .python-version README.md ./
 
-# Copy source code
+# Install dependencies using the lock file (much faster)
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev --no-install-project
+
+# Copy source code and install project
 COPY src/ src/
 COPY config/ config/
-
-# Create virtual environment and install dependencies
-RUN uv venv && \
-    uv pip install --no-cache -e .
+COPY cli.py .
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv sync --frozen --no-dev
 
 # Runtime stage
 FROM python:3.11-slim
@@ -60,10 +67,11 @@ WORKDIR /app
 # Copy virtual environment from builder
 COPY --from=builder --chown=raguser:raguser /app/.venv /app/.venv
 
-# Copy application code
+# Copy application code including new agent module
 COPY --chown=raguser:raguser src/ src/
 COPY --chown=raguser:raguser config/ config/
 COPY --chown=raguser:raguser cli.py .
+COPY --chown=raguser:raguser benchmarks/datasets/ benchmarks/datasets/
 
 # Switch to non-root user
 USER raguser
@@ -71,6 +79,9 @@ USER raguser
 # Add virtual environment to PATH
 ENV PATH="/app/.venv/bin:$PATH"
 ENV PYTHONPATH="/app:$PYTHONPATH"
+
+# Create cache directories for embeddings and models
+RUN mkdir -p /app/cache/embeddings /app/cache/models
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \

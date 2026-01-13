@@ -1,488 +1,154 @@
 # Docker Guide
 
-This guide explains how to use Docker with this project, including when to use each Dockerfile and how to integrate with docker-compose.
+## Dockerfiles
 
-## Table of Contents
-1. [Dockerfile Overview](#dockerfile-overview)
-2. [Building Images](#building-images)
-3. [Running Containers](#running-containers)
-4. [Docker Compose Integration](#docker-compose-integration)
-5. [Best Practices](#best-practices)
+### `Dockerfile` - Production
+- Multi-stage build (~500MB)
+- Production dependencies only
+- Non-root user for security
+- Use for: Deployment, CI/CD
 
-## Dockerfile Overview
-
-### `Dockerfile` - Production Image
-
-**Purpose**: Optimized for production deployment
-
-**Features**:
-- ✅ Multi-stage build (smaller image)
-- ✅ Only production dependencies
-- ✅ Security-focused (non-root user)
-- ✅ Minimal system packages
-- ✅ Fast startup time
-- ✅ ~500MB final image size
-
-**Use Cases**:
-- Production deployment
-- Cloud services (AWS ECS, Azure Container Instances, GCP Cloud Run)
-- Kubernetes clusters
-- CI/CD pipelines
-- Distribution to others
-
-**Example Build**:
 ```bash
 docker build -t naive-rag:latest .
-docker build -t naive-rag:v1.0.0 .  # Tagged version
 ```
 
-### `Dockerfile.dev` - Development Image
+### `Dockerfile.dev` - Development  
+- Full dev dependencies (~800MB)
+- Debugging and testing tools
+- Use for: Local development
 
-**Purpose**: Full development environment in a container
-
-**Features**:
-- ✅ All dev dependencies (pytest, black, mypy, etc.)
-- ✅ Build tools included
-- ✅ Git and debugging tools
-- ✅ Volume mounting support
-- ✅ Interactive shell access
-- ⚠️ ~800MB image size
-
-**Use Cases**:
-- Local development
-- Debugging issues
-- Running tests
-- Code formatting/linting
-- Development without local Python setup
-- Consistent dev environment across team
-
-**Example Build**:
 ```bash
 docker build -f Dockerfile.dev -t naive-rag:dev .
 ```
 
-## Building Images
+## Docker Compose
 
-### Production Image
-
-```bash
-# Basic build
-docker build -t naive-rag:latest .
-
-# Build with specific tag
-docker build -t naive-rag:v1.0.0 .
-
-# Build with no cache (force rebuild)
-docker build --no-cache -t naive-rag:latest .
-
-# Build for specific platform (for deployment)
-docker build --platform linux/amd64 -t naive-rag:latest .
-```
-
-### Development Image
+### Start Services
 
 ```bash
-# Basic build
-docker build -f Dockerfile.dev -t naive-rag:dev .
-
-# Build with progress
-docker build -f Dockerfile.dev -t naive-rag:dev --progress=plain .
-
-# Build with build arguments
-docker build -f Dockerfile.dev \
-  --build-arg PYTHON_VERSION=3.11 \
-  -t naive-rag:dev .
-```
-
-## Running Containers
-
-### Production Container
-
-**Basic Run**:
-```bash
-docker run -it --rm \
-  --name rag-app \
-  --env-file .env \
-  naive-rag:latest
-```
-
-**With Network (to connect to databases)**:
-```bash
-# First, ensure databases are running
-docker-compose up -d postgres neo4j
-
-# Run app container
-docker run -it --rm \
-  --name rag-app \
-  --env-file .env \
-  --network naive-rag-kg-rag_rag_network \
-  naive-rag:latest python cli.py --help
-```
-
-**As Background Service**:
-```bash
-docker run -d \
-  --name rag-app \
-  --restart unless-stopped \
-  --env-file .env \
-  --network naive-rag-kg-rag_rag_network \
-  naive-rag:latest
-```
-
-### Development Container
-
-**Interactive Shell**:
-```bash
-docker run -it --rm \
-  --name rag-dev \
-  -v ${PWD}:/workspace \
-  --env-file .env \
-  --network naive-rag-kg-rag_rag_network \
-  naive-rag:dev bash
-```
-
-**Run Tests**:
-```bash
-docker run -it --rm \
-  -v ${PWD}:/workspace \
-  --env-file .env \
-  --network naive-rag-kg-rag_rag_network \
-  naive-rag:dev uv run pytest tests/
-```
-
-**Run Jupyter**:
-```bash
-docker run -it --rm \
-  -v ${PWD}:/workspace \
-  -p 8888:8888 \
-  --env-file .env \
-  --network naive-rag-kg-rag_rag_network \
-  naive-rag:dev uv run jupyter lab --ip=0.0.0.0 --allow-root
-```
-
-**Format Code**:
-```bash
-docker run -it --rm \
-  -v ${PWD}:/workspace \
-  naive-rag:dev uv run black src tests
-```
-
-## Docker Compose Integration
-
-### Option 1: Add to Existing docker-compose.yml
-
-Add the application service alongside databases:
-
-```yaml
-services:
-  # ... existing postgres and neo4j services ...
-
-  # Production app
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    container_name: rag_app
-    env_file: .env
-    depends_on:
-      postgres:
-        condition: service_healthy
-      neo4j:
-        condition: service_healthy
-    networks:
-      - rag_network
-    volumes:
-      - ./data:/data
-      - ./logs:/logs
-    restart: unless-stopped
-
-  # Development app (commented out by default)
-  # app-dev:
-  #   build:
-  #     context: .
-  #     dockerfile: Dockerfile.dev
-  #   container_name: rag_app_dev
-  #   env_file: .env
-  #   volumes:
-  #     - .:/workspace
-  #   depends_on:
-  #     - postgres
-  #     - neo4j
-  #   networks:
-  #     - rag_network
-  #   command: bash
-  #   stdin_open: true
-  #   tty: true
-```
-
-### Option 2: Separate Compose Files
-
-**docker-compose.yml** (Infrastructure only):
-```yaml
-# Keep only postgres, neo4j, redis, ollama
-```
-
-**docker-compose.app.yml** (Application):
-```yaml
-version: '3.8'
-
-services:
-  app:
-    build:
-      context: .
-      dockerfile: Dockerfile
-    # ... app configuration
-```
-
-**docker-compose.dev.yml** (Development):
-```yaml
-version: '3.8'
-
-services:
-  app-dev:
-    build:
-      context: .
-      dockerfile: Dockerfile.dev
-    # ... dev configuration
-```
-
-**Usage**:
-```bash
-# Infrastructure only
+# Start PostgreSQL and Neo4j
 docker-compose up -d
 
-# Infrastructure + Production app
-docker-compose -f docker-compose.yml -f docker-compose.app.yml up -d
+# Check status
+docker-compose ps
 
-# Infrastructure + Development app
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+# View logs
+docker-compose logs -f postgres
+docker-compose logs -f neo4j
 ```
 
-## Best Practices
+### Service Access
 
-### When to Use Each Approach
+- **PostgreSQL**: localhost:5432
+- **Neo4j Browser**: http://localhost:7474
+- **Neo4j Bolt**: bolt://localhost:7687
 
-| Scenario | Recommended Dockerfile | Run Method |
-|----------|----------------------|------------|
-| Production deployment | `Dockerfile` | docker-compose or standalone |
-| CI/CD testing | `Dockerfile` | docker run |
-| Local development | Neither* | UV locally (faster) |
-| Team standardization | `Dockerfile.dev` | docker-compose.dev.yml |
-| Debugging in isolation | `Dockerfile.dev` | docker run with volumes |
-| Can't install Python locally | `Dockerfile.dev` | docker run interactive |
+### Stop Services
 
-\* **Recommended**: Use UV locally for development - it's faster and more convenient
-
-### Development Workflow Recommendations
-
-**Option A: Local UV (Recommended)**
 ```bash
-# Fastest development workflow
-uv venv
-uv sync --all-extras
+# Stop
+docker-compose down
 
-# Databases in Docker, code runs locally
-docker-compose up -d postgres neo4j
-uv run python cli.py
-uv run pytest
+# Stop and remove volumes (clean slate)
+docker-compose down -v
 ```
 
-**Option B: Hybrid (Good for team consistency)**
+## Running Application in Docker
+
+### Production
+
 ```bash
-# Databases and app in Docker, live code updates
-docker-compose up -d
+# Run once
+docker run --rm \
+  --network naive-rag-kg-rag_default \
+  --env-file .env \
+  naive-rag:latest \
+  python cli.py --help
+
+# Interactive shell
 docker run -it --rm \
-  -v ${PWD}:/workspace \
-  --network rag_network \
-  naive-rag:dev bash
-
-# Inside container:
-uv run python cli.py
+  --network naive-rag-kg-rag_default \
+  --env-file .env \
+  naive-rag:latest \
+  /bin/bash
 ```
 
-**Option C: Full Docker (Good for isolation)**
-```bash
-# Everything in Docker
-docker-compose -f docker-compose.yml -f docker-compose.dev.yml up -d
+### Development
 
-# Exec into container
-docker exec -it rag_app_dev bash
+```bash
+# Mount code for live updates
+docker run -it --rm \
+  --network naive-rag-kg-rag_default \
+  --env-file .env \
+  -v $(pwd)/src:/app/src \
+  -v $(pwd)/tests:/app/tests \
+  naive-rag:dev \
+  /bin/bash
 ```
 
-### Image Size Optimization
+## Common Tasks
 
-**Production Image**:
-- Uses multi-stage build
-- Only copies necessary files
-- Minimal base image (python:3.11-slim)
-- No dev dependencies
-- Result: ~500MB
+### Ingest Documents
 
-**Development Image**:
-- Single stage build
-- Includes all tools
-- Build tools included
-- All dev dependencies
-- Result: ~800MB
-
-### Security Considerations
-
-**Production**:
-- ✅ Runs as non-root user (`raguser`)
-- ✅ Minimal attack surface
-- ✅ No unnecessary packages
-- ✅ Health checks included
-- ✅ Read-only root filesystem (can enable)
-
-**Development**:
-- ⚠️ More packages = larger attack surface
-- ⚠️ Development tools included
-- ⚠️ Should not be used in production
-
-### Volume Mounting
-
-**For Development**:
 ```bash
-# Mount entire project
--v ${PWD}:/workspace
-
-# Mount specific directories
--v ${PWD}/src:/workspace/src
--v ${PWD}/tests:/workspace/tests
--v ${PWD}/data:/workspace/data
-
-# Mount as read-only (for data)
--v ${PWD}/data:/workspace/data:ro
+docker run --rm \
+  --network naive-rag-kg-rag_default \
+  --env-file .env \
+  -v $(pwd)/data:/app/data \
+  naive-rag:latest \
+  python cli.py ingest /app/data/big_tech_docs
 ```
 
-**For Production**:
+### Run Evaluation
+
 ```bash
-# Only mount data/logs, not code
--v ./data:/data
--v ./logs:/logs
+docker run --rm \
+  --network naive-rag-kg-rag_default \
+  --env-file .env \
+  -v $(pwd)/benchmarks:/app/benchmarks \
+  naive-rag:latest \
+  python cli.py evaluate --dataset big_tech_curated
 ```
 
-## Common Commands
+### Run Tests
 
-### Build Both Images
 ```bash
-# Build production
-docker build -t naive-rag:latest .
-
-# Build development
-docker build -f Dockerfile.dev -t naive-rag:dev .
-```
-
-### Clean Up
-```bash
-# Remove all project images
-docker rmi naive-rag:latest naive-rag:dev
-
-# Remove unused images
-docker image prune -a
-
-# Remove all stopped containers
-docker container prune
-```
-
-### Inspect Images
-```bash
-# View image size
-docker images naive-rag
-
-# View image layers
-docker history naive-rag:latest
-
-# Inspect image details
-docker inspect naive-rag:latest
-```
-
-### Push to Registry
-
-**Docker Hub**:
-```bash
-docker tag naive-rag:latest username/naive-rag:latest
-docker push username/naive-rag:latest
-```
-
-**GitHub Container Registry**:
-```bash
-docker tag naive-rag:latest ghcr.io/username/naive-rag:latest
-docker push ghcr.io/username/naive-rag:latest
+docker run --rm naive-rag:dev pytest
 ```
 
 ## Troubleshooting
 
-### Build Failures
-
-**UV Not Found**:
+**Connection issues**:
 ```bash
-# Ensure you're using the latest Dockerfile with UV
-# Rebuild without cache
-docker build --no-cache -t naive-rag:latest .
-```
-
-**Dependency Errors**:
-```bash
-# Clear UV cache in container
-docker build --no-cache -t naive-rag:latest .
-
-# Or modify Dockerfile to add: RUN uv cache clean
-```
-
-### Runtime Issues
-
-**Can't Connect to Databases**:
-```bash
-# Ensure containers are on same network
+# Ensure services are on same network
 docker network ls
-docker network inspect naive-rag-kg-rag_rag_network
-
-# Use correct service names (postgres, neo4j, not localhost)
+docker inspect naive-rag-kg-rag_default
 ```
 
-**Permission Errors**:
+**Permission issues**:
 ```bash
-# Development: Run as root if needed
-docker run --user root ...
-
-# Production: Ensure volumes have correct permissions
-chown -R 1000:1000 ./data ./logs
+# Application runs as non-root user (appuser)
+# Ensure mounted volumes have correct permissions
+chmod -R 755 ./data ./benchmarks
 ```
 
-**Environment Variables Not Working**:
+**Database connection**:
 ```bash
-# Check .env file exists
-ls -la .env
-
-# Use --env-file flag
-docker run --env-file .env ...
-
-# Or pass individually
-docker run -e POSTGRES_PASSWORD=secret ...
+# Use service names, not localhost
+POSTGRES_URL=postgresql://raguser:password@postgres:5432/rag_benchmark
+NEO4J_URI=bolt://neo4j:7687
 ```
 
-## Summary
+## Best Practices
 
-| Task | Use | Command |
-|------|-----|---------|
-| Production deployment | `Dockerfile` | `docker build -t naive-rag:latest .` |
-| Development with Docker | `Dockerfile.dev` | `docker build -f Dockerfile.dev -t naive-rag:dev .` |
-| Local development | UV (no Docker) | `uv sync && uv run python cli.py` |
-| Running tests | `Dockerfile.dev` or UV | `docker run ... uv run pytest` or `uv run pytest` |
-| CI/CD | `Dockerfile` | Build and test in pipeline |
+1. **Use docker-compose** for local development
+2. **Mount volumes** for data persistence
+3. **Use .env file** for configuration
+4. **Tag images** for version control
+5. **Clean up** unused images regularly
 
-**Recommendation**: 
-- 🏆 Use **UV locally** for daily development (fastest)
-- 🐳 Use **Dockerfile.dev** when team needs consistent environment
-- 🚀 Use **Dockerfile** for production deployment
-
-## Next Steps
-
-1. Choose your development approach (UV locally vs Docker)
-2. Build the appropriate image(s)
-3. Update docker-compose.yml if needed
-4. Test your setup
-5. Document your team's chosen workflow
-
-For more details on UV usage, see [UV_MIGRATION.md](UV_MIGRATION.md).
+```bash
+# Clean up
+docker system prune -a
+docker volume prune
+```

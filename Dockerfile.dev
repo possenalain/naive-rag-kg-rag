@@ -33,6 +33,12 @@ RUN apt-get update && \
 # Install UV
 COPY --from=ghcr.io/astral-sh/uv:latest /uv /usr/local/bin/uv
 
+# Set environment variables for faster builds
+ENV UV_COMPILE_BYTECODE=1 \
+    UV_LINK_MODE=copy \
+    PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1
+
 # Create non-root user
 RUN useradd -m -u 1000 devuser && \
     mkdir -p /workspace /home/devuser/.cache && \
@@ -45,24 +51,42 @@ WORKDIR /workspace
 USER devuser
 
 # Copy dependency files
-COPY --chown=devuser:devuser pyproject.toml .
-COPY --chown=devuser:devuser .python-version .
+COPY --chown=devuser:devuser pyproject.toml uv.lock .python-version README.md ./
 
-# Create virtual environment
-RUN uv venv
+# Install dependencies using the lock file with cache mount
+RUN --mount=type=cache,target=/home/devuser/.cache/uv \
+    uv venv && \
+    uv sync --frozen
 
 # Add virtual environment to PATH
 ENV PATH="/workspace/.venv/bin:$PATH"
 ENV PYTHONPATH="/workspace:$PYTHONPATH"
 
-# Install dependencies (will be cached if pyproject.toml doesn't change)
+# Copy minimal structure needed for installation
+COPY --chown=devuser:devuser src/__init__.py src/__init__.py
+COPY --chown=devuser:devuser config/__init__.py config/__init__.py
+
+# Install dependencies (includes LangGraph, LangChain, all dev tools)
 RUN uv sync --all-extras
 
-# Copy application code
-COPY --chown=devuser:devuser . .
+# Note: Application code will be mounted via volume for live updates
+# This allows code changes without rebuilding
+# Volume mount: -v ${PWD}:/workspace
+
+# Create cache directories
+RUN mkdir -p /home/devuser/.cache/embeddings /home/devuser/.cache/models
+
+# Environment variables for development
+ENV UV_CACHE_DIR="/home/devuser/.cache/uv"
+ENV PYTHONUNBUFFERED=1
+ENV PYTHONDONTWRITEBYTECODE=1
 
 # Expose common ports
-EXPOSE 8000 8888
+# 8000: API server
+# 8888: Jupyter notebook
+# 7687: Neo4j (if running internally)
+# 5432: PostgreSQL (if running internally)
+EXPOSE 8000 8888 7687 5432
 
 # Default command (can be overridden)
 CMD ["/bin/bash"]
