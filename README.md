@@ -86,8 +86,7 @@ uv run python cli.py ingest ./data/big_tech_docs
 uv run python cli.py evaluate --num-questions 50 --dataset big_tech_curated
 
 # Analyze results
-uv run python cli.py analyze benchmarks\runs\big_tech_curated_results_J12V1/eval_*.json \
-    --output-dir benchmarks\runs\big_tech_curated_results_J12V1
+uv run python cli.py analyze benchmarks\runs\big_tech_curated_results_J12V1/eval_*.json --output-dir benchmarks\runs\big_tech_curated_results_J12V1
 ```
 
 
