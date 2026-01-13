@@ -229,15 +229,47 @@ class GraphDatabaseManager:
     async def search_entities(
         self,
         query: str,
-        limit: int = 10
+        limit: int = 10,
+        min_similarity: Optional[float] = None
     ) -> List[EntityNode]:
-        """Search for entities semantically using Graphiti."""
-        entities = await self.graphiti.search(
+        """
+        Search for entities semantically using Graphiti.
+        
+        Graphiti's search uses hybrid retrieval (BM25 + vector similarity) with 
+        reranking (RRF), so results are already relevant and ranked. We fetch 
+        what we need and let Graphiti's filtering do the work.
+        
+        Args:
+            query: Search query text
+            limit: Maximum number of entities to return
+            min_similarity: Ignored - kept for API compatibility but has no effect
+                           since Graphiti doesn't expose similarity scores
+        
+        Returns:
+            List of EntityEdge objects (facts/relationships)
+        """
+        # Graphiti's search already does:
+        # 1. Hybrid search (BM25 + cosine similarity)
+        # 2. Relevance filtering (min_score = 0.6 by default)
+        # 3. Reranking (RRF combines both search methods)
+        # So we just fetch what we need - Graphiti handles the quality
+        
+        search_results = await self.graphiti.search(
             query=query,
             num_results=limit
         )
-        logger.debug(f"Found {len(entities)} entities for query: {query}")
-        return entities
+        
+        if not search_results:
+            logger.debug(f"No entities found for query: {query}")
+            return []
+        
+        # Graphiti.search() returns EntityEdge objects (facts/relationships)
+        logger.info(
+            f"Entity search returned {len(search_results)} edges/facts from Graphiti "
+            f"(hybrid BM25 + vector search with RRF reranking)"
+        )
+        
+        return search_results
     
     async def get_entity(self, entity_id: str) -> Optional[EntityNode]:
         """Get an entity by ID."""
@@ -430,7 +462,8 @@ class GraphDatabaseManager:
         self,
         query_text: str,
         top_k: int = 5,
-        max_hops: int = 2
+        max_hops: int = 2,
+        max_chunks: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """
         Knowledge Graph-based retrieval with multi-hop traversal:
@@ -438,33 +471,51 @@ class GraphDatabaseManager:
         2. Expand entities through graph relationships (multi-hop)
         3. Traverse to connected chunks
         4. Rank by relevance (direct matches boosted)
+        
+        Args:
+            query_text: Search query
+            top_k: Number of chunks to return (deprecated, use max_chunks)
+            max_hops: Maximum hops for entity expansion
+            max_chunks: Maximum chunks to return (safety cap, default=20).
+                       Returns all chunks >= min_entity_ratio up to this limit.
         """
         from config.settings import get_settings
         settings = get_settings()
         
-        # Step 1: Search for relevant entities with higher limit for better coverage
-        entity_multiplier = getattr(settings.rag, 'entity_search_multiplier', 5)
+        # Step 1: Search for relevant entities using Graphiti's hybrid search
+        # Graphiti combines BM25 + vector similarity with RRF reranking, so results
+        # are already filtered and ranked by relevance
+        entity_multiplier = getattr(settings.rag, 'entity_search_multiplier', 3)
+        min_entity_similarity = getattr(settings.rag, 'kg_min_entity_similarity', 0.5)
         search_limit = top_k * entity_multiplier
-        search_results = await self.search_entities(query_text, limit=search_limit)
+        
+        search_results = await self.search_entities(
+            query_text, 
+            limit=search_limit,
+            min_similarity=min_entity_similarity
+        )
         
         if not search_results:
-            logger.warning("No entities found for query")
+            logger.warning(
+                f"No entities found for query. Try adjusting RAG_KG_MIN_ENTITY_SIMILARITY or RAG_ENTITY_SEARCH_MULTIPLIER"
+            )
             return []
         
-        # Extract unique entity UUIDs from search results
+        # Extract unique entity UUIDs from search results (EntityEdge objects)
         direct_entity_ids = set()
         for result in search_results:
-            # Graphiti search returns EntityEdge objects
+            # Graphiti search returns EntityEdge objects with source/target entity UUIDs
             if hasattr(result, 'source_node_uuid'):
                 direct_entity_ids.add(result.source_node_uuid)
             if hasattr(result, 'target_node_uuid'):
                 direct_entity_ids.add(result.target_node_uuid)
-            # If it's actually an EntityNode, use its UUID directly
+            # Fallback: if it's an EntityNode, use its UUID directly
             elif hasattr(result, 'uuid') and hasattr(result, 'name'):
                 direct_entity_ids.add(result.uuid)
         
         direct_entity_ids = list(direct_entity_ids)
-        logger.info(f"Found {len(direct_entity_ids)} direct entities from search")
+        
+        logger.info(f"Extracted {len(direct_entity_ids)} unique entities from {len(search_results)} edges")
         
         # Step 2: Multi-hop expansion - find related entities
         enable_multi_hop = getattr(settings.rag, 'kg_enable_multi_hop', True)
@@ -492,17 +543,31 @@ class GraphDatabaseManager:
                 )
                 expansion_records = await result.data()
             
-            # Combine direct and expanded entities
+            # Combine direct and expanded entities with distance-based weights
+            # Direct entities = 1.0, 1-hop = 0.5, 2-hop = 0.25 (exponential decay)
+            entity_weights = {}
+            for entity_id in direct_entity_ids:
+                entity_weights[entity_id] = 1.0
+            
             all_entity_ids = direct_entity_ids.copy()
             expanded_count = 0
             for record in expansion_records:
                 entity_uuid = record['entity_uuid']
+                distance = record['distance']
                 if entity_uuid not in all_entity_ids:
                     all_entity_ids.append(entity_uuid)
+                    entity_weights[entity_uuid] = 1.0 / (2 ** distance)  # 0.5 for hop 1, 0.25 for hop 2
                     expanded_count += 1
             
-            logger.info(f"Expanded to {len(all_entity_ids)} entities total (+{expanded_count} via multi-hop)")
+            logger.info(
+                f"Expanded to {len(all_entity_ids)} entities total (+{expanded_count} via multi-hop, "
+                f"weights: direct={sum(1 for w in entity_weights.values() if w == 1.0)}, "
+                f"1-hop={sum(1 for w in entity_weights.values() if 0.4 < w < 0.6)}, "
+                f"2-hop={sum(1 for w in entity_weights.values() if w < 0.3)})"
+            )
         else:
+            # No expansion - all entities get full weight
+            entity_weights = {entity_id: 1.0 for entity_id in direct_entity_ids}
             all_entity_ids = direct_entity_ids
             logger.info(f"Multi-hop disabled, using {len(all_entity_ids)} direct entities only")
         
@@ -511,11 +576,10 @@ class GraphDatabaseManager:
         relevance_boost = getattr(settings.rag, 'kg_relevance_boost', 0.3)
         min_entity_ratio = getattr(settings.rag, 'kg_min_entity_ratio', 0.3)
         
-        # Precision-focused query:
-        # 1. Calculate direct_ratio = direct_count / entity_count (precision)
-        # 2. Filter chunks where direct_ratio >= min_entity_ratio
-        # 3. Score = (direct_count^2) * direct_ratio * boost
-        #    This heavily favors chunks where most entities are direct matches
+        # Two-stage filtering with weighted scoring:
+        # 1. Filter by direct_recall: direct_count / query_entity_count (MUST have direct entities!)
+        # 2. Score by weighted_direct_count: includes expanded entities with distance decay
+        # 3. This prevents chunks with only expanded entities from passing filter
         retrieval_query = """
             UNWIND $entity_ids as entity_uuid
             MATCH (e:Entity {uuid: entity_uuid})
@@ -523,15 +587,16 @@ class GraphDatabaseManager:
             MATCH (c:Chunk)-[:HAS_EPISODE]->(ep)
             WITH c, 
                  COUNT(DISTINCT e) as entity_count,
-                 SUM(CASE WHEN e.uuid IN $direct_entities THEN 1 ELSE 0 END) as direct_count,
+                 SUM(CASE WHEN e.uuid IN keys($entity_weights) THEN $entity_weights[e.uuid] ELSE 0.0 END) as weighted_direct_count,
+                 COUNT(DISTINCT CASE WHEN e.uuid IN $direct_entities THEN e.uuid ELSE null END) as direct_count,
                  COUNT(DISTINCT ep) as episode_count
-            WITH c, entity_count, direct_count, episode_count,
-                 toFloat(direct_count) / toFloat(entity_count) as direct_ratio
-            WHERE direct_ratio >= $min_ratio
-            WITH c, entity_count, direct_count, episode_count, direct_ratio,
-                 (direct_count * direct_count * direct_ratio * $boost) as relevance_score
-            ORDER BY relevance_score DESC, direct_count DESC, episode_count DESC
-            LIMIT $top_k
+            WITH c, entity_count, weighted_direct_count, direct_count, episode_count,
+                 toFloat(direct_count) / toFloat(size($direct_entities)) as direct_recall
+            WHERE direct_recall >= $min_ratio
+            WITH c, entity_count, weighted_direct_count, direct_count, episode_count, direct_recall,
+                 (weighted_direct_count * weighted_direct_count * direct_recall * $boost) as relevance_score
+            ORDER BY relevance_score DESC, weighted_direct_count DESC, episode_count DESC
+            LIMIT $limit
             RETURN c.chunk_id as chunk_id,
                    c.chunk_text as chunk_text,
                    c.document_id as document_id,
@@ -539,29 +604,36 @@ class GraphDatabaseManager:
                    relevance_score,
                    entity_count,
                    direct_count,
+                   weighted_direct_count,
                    episode_count,
-                   direct_ratio
+                   direct_recall
         """
+        
+        # Use max_chunks if provided (for threshold-based retrieval), otherwise use top_k
+        # Default to 20 as safety cap to prevent token explosion
+        limit = max_chunks if max_chunks is not None else (20 if max_chunks is None and top_k == 5 else top_k)
         
         async with self.driver.session() as session:
             result = await session.run(
                 retrieval_query,
                 entity_ids=all_entity_ids,
                 direct_entities=direct_entity_ids,
+                entity_weights=entity_weights,
                 boost=relevance_boost,
                 min_ratio=min_entity_ratio,
-                top_k=top_k
+                limit=limit
             )
             records = await result.data()
         
         # Log detailed statistics for debugging
         if records:
-            avg_ratio = sum(r.get('direct_ratio', 0) for r in records) / len(records)
+            avg_recall = sum(r.get('direct_recall', 0) for r in records) / len(records)
             avg_direct = sum(r.get('direct_count', 0) for r in records) / len(records)
+            avg_weighted = sum(r.get('weighted_direct_count', 0) for r in records) / len(records)
             logger.info(
                 f"KG retrieval: {len(records)} chunks, "
-                f"avg direct_ratio={avg_ratio:.2f}, avg direct_count={avg_direct:.1f}, "
-                f"entities={len(all_entity_ids)}, min_ratio={min_entity_ratio}"
+                f"avg direct_recall={avg_recall:.2f}, avg weighted_count={avg_weighted:.1f}, "
+                f"avg direct_count={avg_direct:.1f}, entities={len(all_entity_ids)}, min_ratio={min_entity_ratio}"
             )
         else:
             logger.warning(

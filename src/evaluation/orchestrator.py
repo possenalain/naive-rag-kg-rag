@@ -80,6 +80,9 @@ class EvaluationOrchestrator:
         start_time = datetime.utcnow()
         logger.info(f"Starting evaluation on dataset: {dataset_name}")
         
+        # Log evaluation settings
+        self._log_evaluation_settings()
+        
         # Step 1: Load benchmark questions from JSON file
         questions = self._load_questions_from_json(
             dataset_name=dataset_name,
@@ -278,6 +281,53 @@ class EvaluationOrchestrator:
                 'avg_scores': avg_scores(hybrid_scores)
             }
         }
+    
+    def _log_evaluation_settings(self):
+        """Log all relevant settings for this evaluation run dynamically."""
+        logger.info("=" * 80)
+        logger.info("EVALUATION SETTINGS")
+        logger.info("=" * 80)
+        
+        # Get all settings sections
+        settings_sections = {
+            "RAG Configuration": settings.rag,
+            "LLM Configuration": settings.llm,
+            "Embedding Configuration": settings.embedding,
+            "Evaluation Configuration": settings.evaluation,
+            "Database Configuration": settings.database,
+            "Neo4j Configuration": settings.neo4j,
+            "Ingestion Configuration": settings.ingestion,
+            "Benchmark Configuration": settings.benchmark,
+        }
+        
+        for section_name, section_config in settings_sections.items():
+            logger.info(f"\n{section_name}:")
+            
+            # Get all fields from the Pydantic model
+            if hasattr(section_config, 'model_fields'):
+                # Pydantic v2
+                for field_name, field_info in section_config.model_fields.items():
+                    value = getattr(section_config, field_name, None)
+                    # Format field name for display (snake_case to Title Case)
+                    display_name = field_name.replace('_', ' ').title()
+                    
+                    # Mask sensitive values
+                    if any(sensitive in field_name.lower() for sensitive in ['password', 'key', 'secret', 'token']):
+                        value = '***' if value else None
+                    
+                    logger.info(f"  - {display_name}: {value}")
+            elif hasattr(section_config, '__fields__'):
+                # Pydantic v1
+                for field_name in section_config.__fields__.keys():
+                    value = getattr(section_config, field_name, None)
+                    display_name = field_name.replace('_', ' ').title()
+                    
+                    if any(sensitive in field_name.lower() for sensitive in ['password', 'key', 'secret', 'token']):
+                        value = '***' if value else None
+                    
+                    logger.info(f"  - {display_name}: {value}")
+        
+        logger.info("=" * 80)
     
     def _load_questions_from_json(
         self,

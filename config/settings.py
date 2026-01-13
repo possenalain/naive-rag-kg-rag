@@ -117,13 +117,16 @@ class RAGSettings(BaseSettings):
     
     model_config = SettingsConfigDict(env_prefix="RAG_", env_file=".env", extra="ignore")
     
-    top_k: int = Field(default=5, ge=1, description="Number of chunks to retrieve")
+    top_k: int = Field(default=5, ge=1, description="Number of chunks to retrieve (deprecated, use max_chunks for threshold-based retrieval)")
+    max_chunks: int = Field(default=20, ge=1, le=100, description="Maximum chunks to send to LLM (safety cap for threshold-based retrieval)")
+    vector_similarity_threshold: float = Field(default=0.5, ge=0.0, le=1.0, description="Minimum cosine similarity for vector search (Naive RAG)")
     max_hops: int = Field(default=2, ge=1, le=10, description="Max hops for graph traversal")
     entity_search_multiplier: int = Field(default=2, ge=1, description="Multiplier for initial entity search (top_k * multiplier)")
     kg_enable_multi_hop: bool = Field(default=True, description="Enable multi-hop graph traversal")
     kg_relevance_boost: float = Field(default=2.0, ge=0.0, le=5.0, description="Score boost for direct entity matches")
-    kg_min_entity_ratio: float = Field(default=0.3, ge=0.0, le=1.0, description="Minimum ratio of direct entities to total entities in chunk (precision filter)")
-    hybrid_fusion_strategy: Literal["rrf", "weighted", "concatenation"] = Field(
+    kg_min_entity_ratio: float = Field(default=0.3, ge=0.0, le=1.0, description="Minimum ratio of query entities covered in chunk (recall: direct_count / query_entity_count)")
+    kg_min_entity_similarity: float = Field(default=0.5, ge=0.0, le=1.0, description="Minimum cosine similarity for entity search results (filters weakly related entities)")
+    hybrid_fusion_strategy: Literal["rrf", "weighted", "concatenation", "adaptive"] = Field(
         default="rrf",
         description="Fusion strategy for hybrid RAG"
     )

@@ -17,6 +17,9 @@ from config.settings import get_settings
 logger = logging.getLogger(__name__)
 settings = get_settings()
 
+# Suppress verbose AFC (Automatic Function Calling) messages from Google Gemini
+logging.getLogger('google_genai.models').setLevel(logging.WARNING)
+
 
 class LLMProvider(str, Enum):
     """Supported LLM providers."""

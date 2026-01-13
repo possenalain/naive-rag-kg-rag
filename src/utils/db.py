@@ -219,19 +219,22 @@ class DatabaseManager:
         query_embedding: List[float],
         top_k: int = 5,
         similarity_threshold: float = 0.5,
-        document_ids: Optional[List[int]] = None
+        document_ids: Optional[List[int]] = None,
+        max_chunks: Optional[int] = None
     ) -> List[Dict[str, Any]]:
         """
         Perform cosine similarity search on chunk embeddings.
         
         Args:
             query_embedding: Query vector
-            top_k: Number of results to return
+            top_k: Number of results to return (deprecated, use max_chunks instead)
             similarity_threshold: Minimum similarity score (0-1)
             document_ids: Optional filter by document IDs
+            max_chunks: Maximum chunks to return (safety cap). If None, uses top_k.
+                       Use this to return all chunks >= threshold up to a limit.
         
         Returns:
-            List of chunks with similarity scores
+            List of chunks with similarity scores (all >= threshold, up to max_chunks)
         """
         # Convert embedding list to PostgreSQL vector format string
         embedding_str = '[' + ','.join(str(x) for x in query_embedding) + ']'
@@ -275,7 +278,9 @@ class DatabaseManager:
             ORDER BY rc.similarity_score DESC
             LIMIT $""" + str(len(params) + 2)
         
-        params.extend([similarity_threshold, top_k])
+        # Use max_chunks if provided (for threshold-based retrieval), otherwise use top_k
+        limit = max_chunks if max_chunks is not None else top_k
+        params.extend([similarity_threshold, limit])
         
         # Debug logging
         logger.info(f"Vector search with similarity_threshold={similarity_threshold}, top_k={top_k}")

@@ -50,7 +50,7 @@ class NaiveRAG:
         self,
         query: str,
         top_k: Optional[int] = None,
-        similarity_threshold: float = 0.5
+        similarity_threshold: Optional[float] = None
     ) -> List[Dict[str, Any]]:
         """
         Retrieve relevant chunks using vector similarity.
@@ -58,7 +58,7 @@ class NaiveRAG:
         Args:
             query: User query
             top_k: Number of chunks to retrieve
-            similarity_threshold: Minimum similarity score
+            similarity_threshold: Minimum similarity score (uses config default if None)
         
         Returns:
             List of retrieved chunks with metadata
@@ -67,20 +67,22 @@ class NaiveRAG:
             await self.initialize()
         
         k = top_k or self.top_k
+        threshold = similarity_threshold if similarity_threshold is not None else settings.rag.vector_similarity_threshold
         
         # Step 1: Embed query
         logger.debug(f"Embedding query: {query}")
         query_embedding = await self.embedder.embed_text(query)
         
-        # Step 2: Vector search
-        logger.debug(f"Performing vector search (top_k={k})")
+        # Step 2: Vector search (threshold-based with safety cap)
+        logger.debug(f"Performing vector search (max_chunks={settings.rag.max_chunks}, similarity>={threshold})")
         results = await self.db.vector_search(
             query_embedding=query_embedding,
             top_k=k,
-            similarity_threshold=similarity_threshold
+            similarity_threshold=threshold,
+            max_chunks=settings.rag.max_chunks
         )
         
-        logger.info(f"Retrieved {len(results)} chunks (similarity >= {similarity_threshold})")
+        logger.info(f"Retrieved {len(results)} chunks (similarity >= {threshold}, capped at {settings.rag.max_chunks})")
         return results
     
     def _construct_prompt(

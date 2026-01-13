@@ -76,12 +76,13 @@ class KnowledgeGraphRAG:
         k = top_k or self.top_k
         hops = max_hops or self.max_hops
         
-        # Use Graphiti's knowledge graph retrieval
-        logger.debug(f"Performing KG retrieval (top_k={k}, max_hops={hops})")
+        # Use Graphiti's knowledge graph retrieval (threshold-based with safety cap)
+        logger.debug(f"Performing KG retrieval (max_chunks={settings.rag.max_chunks}, max_hops={hops})")
         results = await self.graph.kg_retrieve(
             query_text=query,
             top_k=k,
-            max_hops=hops
+            max_hops=hops,
+            max_chunks=settings.rag.max_chunks
         )
         
         # Enrich with document metadata from PostgreSQL
@@ -98,7 +99,7 @@ class KnowledgeGraphRAG:
                     'retrieval_score': result.get('relevance_score', 1.0)
                 })
         
-        logger.info(f"Retrieved {len(enriched_results)} chunks via KG")
+        logger.info(f"Retrieved {len(enriched_results)} chunks via KG (recall >= {settings.rag.kg_min_entity_ratio}, capped at {settings.rag.max_chunks})")
         return enriched_results
     
     def _construct_prompt(

@@ -1,6 +1,14 @@
 """
 Hybrid RAG: Combines vector similarity and knowledge graph retrieval.
 Uses fusion strategies to merge results from both approaches.
+
+IMPORTANT - Score Normalization:
+- Vector scores: Already normalized 0-1 (cosine similarity), filtered at threshold (e.g., 0.7+)
+- KG scores: Raw values from (weighted_count² × recall × boost) typically 10-80
+- Fusion normalization: DYNAMIC range mapping
+  * Calculates actual min/max from current vector and KG results
+  * Maps KG range -> vector range to ensure equal weighting
+  * Adapts to different query patterns and scoring configurations
 """
 
 import asyncio
@@ -24,13 +32,14 @@ class HybridRAG:
     Fusion Strategies:
     - RRF (Reciprocal Rank Fusion): Combines rankings from both methods
     - Weighted: Weighted combination of scores
+    - Adaptive: Combines RRF (robust rank-based) + weighted scores (value-based)
     - Concatenation: Simply concatenate results from both methods
     """
     
     def __init__(
         self,
         top_k: Optional[int] = None,
-        fusion_strategy: Optional[Literal["rrf", "weighted", "concatenation"]] = None,
+        fusion_strategy: Optional[Literal["rrf", "weighted", "adaptive", "concatenation"]] = None,
         vector_weight: float = 0.5,
         graph_weight: float = 0.5
     ):
@@ -69,7 +78,7 @@ class HybridRAG:
         
         Args:
             query: User query
-            top_k: Number of chunks to retrieve
+            top_k: Number of chunks to retrieve (deprecated, uses max_chunks for threshold-based retrieval)
         
         Returns:
             Fused list of retrieved chunks
@@ -78,8 +87,9 @@ class HybridRAG:
             await self.initialize()
         
         k = top_k or self.top_k
+        max_chunks = settings.rag.max_chunks
         
-        # Retrieve from both methods in parallel
+        # Retrieve from both methods in parallel (they use max_chunks internally)
         logger.debug("Performing hybrid retrieval (vector + KG)")
         vector_results, kg_results = await asyncio.gather(
             self.naive_rag.retrieve(query, top_k=k),
@@ -88,28 +98,62 @@ class HybridRAG:
         
         logger.info(f"Vector: {len(vector_results)} chunks, KG: {len(kg_results)} chunks")
         
-        # Fuse results based on strategy
+        # Fuse results based on strategy (use max_chunks for fusion limit)
         if self.fusion_strategy == "rrf":
-            fused_results = self._rrf_fusion(vector_results, kg_results, k)
+            fused_results = self._rrf_fusion(vector_results, kg_results, max_chunks)
         elif self.fusion_strategy == "weighted":
-            fused_results = self._weighted_fusion(vector_results, kg_results, k)
+            fused_results = self._weighted_fusion(vector_results, kg_results, max_chunks)
+        elif self.fusion_strategy == "adaptive":
+            fused_results = self._adaptive_fusion(vector_results, kg_results, max_chunks)
         else:  # concatenation
-            fused_results = self._concatenation_fusion(vector_results, kg_results, k)
+            fused_results = self._concatenation_fusion(vector_results, kg_results, max_chunks)
         
-        logger.info(f"Hybrid retrieval returned {len(fused_results)} chunks")
+        # Count source composition of final results
+        vector_only = 0
+        kg_only = 0
+        both = 0
+        vector_total_score = 0
+        kg_total_score = 0
+        
+        for chunk in fused_results:
+            sources = chunk.get('retrieval_sources', [])
+            fusion_score = chunk.get('fusion_score', 0)
+            
+            if len(sources) == 2 or (len(sources) == 1 and 'both' in sources):
+                both += 1
+                # For chunks in both, score is shared
+                vector_total_score += fusion_score / 2
+                kg_total_score += fusion_score / 2
+            elif 'vector' in sources:
+                vector_only += 1
+                vector_total_score += fusion_score
+            elif 'kg' in sources:
+                kg_only += 1
+                kg_total_score += fusion_score
+        
+        total_score = vector_total_score + kg_total_score
+        vector_pct = (vector_total_score / total_score * 100) if total_score > 0 else 0
+        kg_pct = (kg_total_score / total_score * 100) if total_score > 0 else 0
+        
+        logger.info(
+            f"Hybrid retrieval returned {len(fused_results)} chunks "
+            f"(vector_only={vector_only}, kg_only={kg_only}, both={both}) | "
+            f"Score contribution: vector={vector_pct:.1f}%, kg={kg_pct:.1f}%"
+        )
         return fused_results
     
     def _rrf_fusion(
         self,
         vector_results: List[Dict[str, Any]],
         kg_results: List[Dict[str, Any]],
-        top_k: int,
+        max_chunks: int,
         rrf_k: int = 60
     ) -> List[Dict[str, Any]]:
         """
         Reciprocal Rank Fusion.
         
         RRF score = 1 / (k + rank)
+        Returns all fused chunks up to max_chunks limit.
         """
         chunk_scores = {}
         
@@ -143,12 +187,12 @@ class HybridRAG:
                     'sources': ['kg']
                 }
         
-        # Sort by RRF score and return top-k
+        # Sort by RRF score and return up to max_chunks
         sorted_chunks = sorted(
             chunk_scores.values(),
             key=lambda x: x['rrf_score'],
             reverse=True
-        )[:top_k]
+        )[:max_chunks]
         
         # Format results
         results = []
@@ -166,17 +210,43 @@ class HybridRAG:
         self,
         vector_results: List[Dict[str, Any]],
         kg_results: List[Dict[str, Any]],
-        top_k: int
+        max_chunks: int
     ) -> List[Dict[str, Any]]:
         """
         Weighted fusion using scores from each method.
+        Uses dynamic normalization to map KG scores to vector score range.
+        Returns all fused chunks up to max_chunks limit.
         """
         chunk_scores = {}
+        
+        # Get vector score range for normalization target
+        vector_scores = [c.get('similarity_score', 0.5) for c in vector_results]
+        vector_min = min(vector_scores) if vector_scores else 0.7
+        vector_max = max(vector_scores) if vector_scores else 1.0
+        
+        # Get KG score range for normalization source
+        kg_raw_scores = [c.get('relevance_score', 1.0) for c in kg_results]
+        if kg_raw_scores:
+            kg_min = min(kg_raw_scores)
+            kg_max = max(kg_raw_scores)
+            kg_range = kg_max - kg_min
+            
+            # Handle zero range: use vector mean instead of vector_min
+            if kg_range == 0:
+                kg_fallback_score = (vector_min + vector_max) / 2
+                logger.debug(f"Zero KG range detected, using vector mean {kg_fallback_score:.3f} for all KG scores")
+        else:
+            kg_min, kg_max, kg_range = 10.0, 80.0, 70.0  # Fallback
+            kg_fallback_score = None
+        
+        logger.debug(
+            f"Score ranges - Vector: [{vector_min:.2f}, {vector_max:.2f}], "
+            f"KG: [{kg_min:.2f}, {kg_max:.2f}]"
+        )
         
         # Score vector results
         for chunk in vector_results:
             chunk_id = chunk['chunk_id']
-            # Normalize similarity score (already 0-1)
             vector_score = chunk.get('similarity_score', 0.5)
             
             chunk_scores[chunk_id] = {
@@ -185,11 +255,18 @@ class HybridRAG:
                 'sources': ['vector']
             }
         
-        # Add KG results
+        # Add KG results with dynamic normalization
         for chunk in kg_results:
             chunk_id = chunk['chunk_id']
-            # Normalize relevance score
-            kg_score = chunk.get('relevance_score', 1.0) / 10.0  # Assume max 10
+            kg_raw = chunk.get('relevance_score', 1.0)
+            
+            # Handle zero range edge case
+            if kg_range == 0:
+                kg_score = kg_fallback_score
+            else:
+                # Map KG score range to vector score range dynamically
+                kg_normalized = vector_min + ((kg_raw - kg_min) / kg_range) * (vector_max - vector_min)
+                kg_score = max(min(kg_normalized, 1.0), 0.0)  # Clamp to [0, 1]
             
             if chunk_id in chunk_scores:
                 chunk_scores[chunk_id]['weighted_score'] += kg_score * self.graph_weight
@@ -201,12 +278,12 @@ class HybridRAG:
                     'sources': ['kg']
                 }
         
-        # Sort and return top-k
+        # Sort and return up to max_chunks
         sorted_chunks = sorted(
             chunk_scores.values(),
             key=lambda x: x['weighted_score'],
             reverse=True
-        )[:top_k]
+        )[:max_chunks]
         
         results = []
         for item in sorted_chunks:
@@ -219,15 +296,139 @@ class HybridRAG:
         logger.debug(f"Weighted fusion: {len(results)} unique chunks")
         return results
     
+    def _adaptive_fusion(
+        self,
+        vector_results: List[Dict[str, Any]],
+        kg_results: List[Dict[str, Any]],
+        max_chunks: int,
+        rrf_k: int = 60,
+        weight_alpha: float = 0.3
+    ) -> List[Dict[str, Any]]:
+        """
+        Adaptive fusion: Combines RRF (rank robustness) + weighted scores (value precision).
+        
+        Final score = RRF_score + (weighted_score * alpha)
+        - RRF provides rank-based robustness (no normalization needed)
+        - Weighted scores add value-based signal from similarity/relevance
+        - Alpha balances contribution (default 0.3 = RRF dominant)
+        - Uses dynamic normalization to map KG scores to vector score range
+        Returns all fused chunks up to max_chunks limit.
+        """
+        chunk_scores = {}
+        
+        # Get score ranges for dynamic normalization
+        vector_scores_list = [c.get('similarity_score', 0.5) for c in vector_results]
+        kg_raw_scores = [c.get('relevance_score', 1.0) for c in kg_results]
+        
+        vector_min = min(vector_scores_list) if vector_scores_list else 0.7
+        vector_max = max(vector_scores_list) if vector_scores_list else 1.0
+        
+        if kg_raw_scores:
+            kg_min = min(kg_raw_scores)
+            kg_max = max(kg_raw_scores)
+            kg_range = kg_max - kg_min
+            
+            # Handle zero range: use vector mean instead of vector_min
+            if kg_range == 0:
+                kg_fallback_score = (vector_min + vector_max) / 2
+                logger.debug(f"Zero KG range in adaptive fusion, using vector mean {kg_fallback_score:.3f}")
+        else:
+            kg_min, kg_max, kg_range = 10.0, 80.0, 70.0  # Fallback
+            kg_fallback_score = None
+        
+        logger.debug(
+            f"Adaptive fusion score ranges - Vector: [{vector_min:.2f}, {vector_max:.2f}], "
+            f"KG: [{kg_min:.2f}, {kg_max:.2f}]"
+        )
+        
+        # Process vector results: RRF + weighted score
+        for rank, chunk in enumerate(vector_results, start=1):
+            chunk_id = chunk['chunk_id']
+            rrf_score = 1.0 / (rrf_k + rank)
+            vector_score = chunk.get('similarity_score', 0.5)  # Already 0-1
+            weighted_score = vector_score * self.vector_weight
+            
+            chunk_scores[chunk_id] = {
+                'chunk': chunk,
+                'rrf_score': rrf_score,
+                'weighted_score': weighted_score,
+                'vector_rank': rank,
+                'vector_score': vector_score,
+                'sources': ['vector']
+            }
+        
+        # Process KG results: RRF + weighted score with dynamic normalization
+        for rank, chunk in enumerate(kg_results, start=1):
+            chunk_id = chunk['chunk_id']
+            rrf_score = 1.0 / (rrf_k + rank)
+            kg_raw_score = chunk.get('relevance_score', 1.0)
+            
+            # Handle zero range edge case
+            if kg_range == 0:
+                kg_normalized = kg_fallback_score
+            else:
+                # Map KG score range to vector score range dynamically
+                kg_normalized = vector_min + ((kg_raw_score - kg_min) / kg_range) * (vector_max - vector_min)
+                kg_normalized = max(min(kg_normalized, 1.0), 0.0)  # Clamp to [0, 1]
+            
+            weighted_score = kg_normalized * self.graph_weight
+            
+            if chunk_id in chunk_scores:
+                # Appears in BOTH: Add RRF scores + combine weighted scores
+                chunk_scores[chunk_id]['rrf_score'] += rrf_score
+                chunk_scores[chunk_id]['weighted_score'] += weighted_score
+                chunk_scores[chunk_id]['sources'].append('kg')
+                chunk_scores[chunk_id]['kg_rank'] = rank
+                chunk_scores[chunk_id]['kg_score'] = kg_normalized
+            else:
+                chunk_scores[chunk_id] = {
+                    'chunk': chunk,
+                    'rrf_score': rrf_score,
+                    'weighted_score': weighted_score,
+                    'kg_rank': rank,
+                    'kg_score': kg_normalized,
+                    'sources': ['kg']
+                }
+        
+        # Calculate final adaptive scores: RRF + (weighted * alpha)
+        for chunk_id, data in chunk_scores.items():
+            data['adaptive_score'] = data['rrf_score'] + (data['weighted_score'] * weight_alpha)
+        
+        # Sort by adaptive score and return up to max_chunks
+        sorted_chunks = sorted(
+            chunk_scores.values(),
+            key=lambda x: x['adaptive_score'],
+            reverse=True
+        )[:max_chunks]
+        
+        # Format results
+        results = []
+        for item in sorted_chunks:
+            chunk = item['chunk'].copy()
+            chunk['fusion_score'] = item['adaptive_score']
+            chunk['rrf_component'] = item['rrf_score']
+            chunk['weighted_component'] = item['weighted_score']
+            chunk['retrieval_sources'] = item['sources']
+            chunk['fusion_strategy'] = 'adaptive'
+            results.append(chunk)
+        
+        logger.debug(
+            f"Adaptive fusion: {len(results)} chunks "
+            f"(avg RRF={sum(r['rrf_component'] for r in results)/len(results):.4f}, "
+            f"avg weighted={sum(r['weighted_component'] for r in results)/len(results):.4f})"
+        )
+        return results
+    
     def _concatenation_fusion(
         self,
         vector_results: List[Dict[str, Any]],
         kg_results: List[Dict[str, Any]],
-        top_k: int
+        max_chunks: int
     ) -> List[Dict[str, Any]]:
         """
         Simple concatenation with deduplication.
         Prioritizes vector results, then adds KG results.
+        Returns all unique chunks up to max_chunks limit.
         """
         seen_chunk_ids = set()
         results = []
@@ -242,7 +443,7 @@ class HybridRAG:
                 results.append(chunk_copy)
                 seen_chunk_ids.add(chunk_id)
                 
-                if len(results) >= top_k:
+                if len(results) >= max_chunks:
                     break
         
         # Add KG results
@@ -255,11 +456,11 @@ class HybridRAG:
                 results.append(chunk_copy)
                 seen_chunk_ids.add(chunk_id)
                 
-                if len(results) >= top_k:
+                if len(results) >= max_chunks:
                     break
         
         logger.debug(f"Concatenation fusion: {len(results)} unique chunks")
-        return results[:top_k]
+        return results[:max_chunks]
     
     def _construct_prompt(
         self,
