@@ -32,7 +32,7 @@ venv.bak/
 
 # UV (Python package manager)
 .venv/
-uv.lock
+# uv.lock should be committed for reproducible builds
 .python-version.lock
 
 # Jupyter Notebook
