@@ -123,12 +123,15 @@ def evaluate(dataset, dataset_path, num_questions, output_dir):
 @cli.command()
 @click.option('--variant', type=click.Choice(['naive', 'kg', 'hybrid']), default='hybrid')
 @click.option('--top-k', default=5, type=int, help='Number of chunks to retrieve')
-def query(variant, top_k):
+@click.option('--use-agent/--no-agent', default=True, help='Use intelligent agent for query routing')
+def query(variant, top_k, use_agent):
     """Interactive chat session using specified RAG variant. Type 'exit' or 'quit' to end."""
     async def run():
         from src.rag_variants.naive_rag import NaiveRAG
         from src.rag_variants.kg_rag import KnowledgeGraphRAG
         from src.rag_variants.hybrid_rag import HybridRAG
+        from src.agent.langgraph_agent import LangGraphRAGAgent
+        from src.utils.llm import get_llm
         
         # Initialize appropriate RAG system
         if variant == 'naive':
@@ -138,14 +141,48 @@ def query(variant, top_k):
         else:
             rag = HybridRAG(top_k=top_k)
         
+        mode = "Intelligent Agent" if use_agent else "Direct RAG"
         click.echo(f"\n╔══════════════════════════════════════════════════════════╗")
-        click.echo(f"║  RAG Interactive Query Session ({variant.upper()}){'': <{63-len(variant)}}║")
+        click.echo(f"║  RAG Interactive Query Session ({variant.upper()} - {mode}){'': <{50-len(variant)-len(mode)}}║")
         click.echo(f"╚══════════════════════════════════════════════════════════╝")
         click.echo(f"\nInitializing {variant.upper()} RAG system...")
         
         await rag.initialize()
         
-        click.echo(f"✓ Ready! Type your questions (or 'exit'/'quit' to end)\n")
+        # Initialize agent if enabled
+        agent = None
+        if use_agent:
+            click.echo("Initializing LangGraph agent...")
+            llm = await get_llm()
+            
+            # Status callback for agent
+            def status_callback(message: str, level: str = "info"):
+                if level == "thought":
+                    click.echo(click.style(message, fg='cyan'))
+                elif level == "action":
+                    click.echo(click.style(message, fg='yellow', bold=True))
+                elif level == "tool":
+                    click.echo(click.style(message, fg='magenta'))
+                elif level == "observation":
+                    click.echo(click.style(message, fg='blue'))
+                elif level == "success":
+                    click.echo(click.style(message, fg='green'))
+                elif level == "error":
+                    click.echo(click.style(message, fg='red'))
+                elif level == "warning":
+                    click.echo(click.style(message, fg='yellow'))
+                else:
+                    click.echo(message)
+            
+            agent = LangGraphRAGAgent(
+                llm=llm,
+                rag_system=rag,
+                max_iterations=5,
+                status_callback=status_callback
+            )
+            click.echo("✓ Agent ready (analyze → retrieve → answer)")
+        
+        click.echo(f"\n✓ Ready! Type your questions (or 'exit'/'quit' to end)\n")
         
         # Interactive loop
         while True:
@@ -162,14 +199,37 @@ def query(variant, top_k):
                 if not question.strip():
                     continue
                 
-                # Generate answer
-                click.echo(f"\n💭 {variant.upper()} RAG: Thinking...")
-                result = await rag.generate(question)
-                
-                # Display answer
-                click.echo(f"\n✓ Answer:\n")
-                click.echo(result['answer'])
-                click.echo(f"\n📊 [Retrieved {len(result['retrieved_chunks'])} chunks in {result['latency_ms']:.2f}ms]")
+                if use_agent:
+                    # Use LangGraph agent
+                    click.echo(f"\n🤖 Agent: Processing query...\n")
+                    result = await agent.run(question)
+                    
+                    # Display answer
+                    click.echo(f"\n{'='*60}")
+                    click.echo(click.style("✓ Answer:", fg='green', bold=True))
+                    click.echo(f"{'='*60}\n")
+                    click.echo(result['answer'])
+                    click.echo(f"\n{'─'*60}")
+                    
+                    # Show agent path
+                    path = "analyze"
+                    if result.get('needs_retrieval'):
+                        path += " → retrieve → answer"
+                    else:
+                        path += " → answer (direct)"
+                    
+                    click.echo(f"🔄 Agent Path: {path}")
+                    click.echo(f"📊 Iterations: {result['iterations']}, Time: {result.get('duration_ms', 0):.0f}ms")
+                    click.echo(f"{'─'*60}")
+                else:
+                    # Direct RAG (original behavior)
+                    click.echo(f"\n💭 {variant.upper()} RAG: Thinking...")
+                    result = await rag.generate(question)
+                    
+                    # Display answer
+                    click.echo(f"\n✓ Answer:\n")
+                    click.echo(result['answer'])
+                    click.echo(f"\n📊 [Retrieved {len(result['retrieved_chunks'])} chunks in {result['latency_ms']:.2f}ms]")
                 
             except (KeyboardInterrupt, EOFError):
                 click.echo("\n\n👋 Goodbye!")
