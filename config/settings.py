@@ -13,6 +13,18 @@ class DatabaseSettings(BaseSettings):
     """Database configuration settings."""
     
     model_config = SettingsConfigDict(env_prefix="POSTGRES_", env_file=".env", extra="ignore")
+    # The above code snippet appears to be defining a Pydantic model for PostgreSQL database
+    # connection configuration parameters. It includes fields for the connection URL, database name,
+    # database user, database password, connection pool size, max overflow connections, and pool
+    # timeout in seconds. The `Field` class is used to specify metadata for each field such as default
+    # values and descriptions. This model can be used to validate and serialize/deserialize data
+    # related to PostgreSQL database connections.
+    # The above code snippet is defining a Pydantic model in Python. This model is specifying fields
+    # for PostgreSQL database connection configuration parameters such as URL, database name, user,
+    # password, connection pool size, max overflow connections, and pool timeout. The `Field` class is
+    # used to define these fields with specific descriptions and default values where applicable. This
+    # model can be used for validating and parsing input data related to PostgreSQL database
+    # connection settings.
     
     url: str = Field(..., description="PostgreSQL connection URL")
     db: str = Field(default="rag_benchmark", description="Database name")
