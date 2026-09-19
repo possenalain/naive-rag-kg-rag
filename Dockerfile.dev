@@ -54,7 +54,7 @@ USER devuser
 COPY --chown=devuser:devuser pyproject.toml uv.lock .python-version README.md ./
 
 # Install dependencies using the lock file with cache mount
-RUN --mount=type=cache,target=/home/devuser/.cache/uv \
+RUN --mount=type=cache,target=/home/devuser/.cache/uv,uid=1000,gid=1000 \
     uv venv && \
     uv sync --frozen
 
