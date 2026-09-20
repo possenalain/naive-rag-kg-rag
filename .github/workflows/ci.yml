@@ -48,7 +48,7 @@ jobs:
     
     - name: Free up runner disk space
       run: |
-        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL
+        sudo rm -rf /usr/share/dotnet /usr/local/lib/android /opt/ghc /opt/hostedtoolcache/CodeQL /usr/local/share/boost /usr/share/swift /opt/az /usr/local/.ghcup /usr/local/share/powershell
         sudo docker image prune --all --force
         df -h /
 
@@ -61,6 +61,8 @@ jobs:
       run: |
         docker buildx install
         DOCKER_BUILDKIT=1 make docker-build
+        docker builder prune --all --force
+        df -h /
     
     - name: Build development Docker image
       run: |
